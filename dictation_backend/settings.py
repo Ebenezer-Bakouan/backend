@@ -166,7 +166,7 @@ CELERY_TIMEZONE = TIME_ZONE
 
 # Media files
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Cloudinary settings
 CLOUDINARY_STORAGE = {
@@ -205,7 +205,4 @@ LOGGING = {
 }
 
 # Gemini API settings
-GEMINI_API_KEY = 'AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI'
-
-# Media files
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage' 
+GEMINI_API_KEY = 'AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI' 
