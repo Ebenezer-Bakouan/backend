@@ -28,42 +28,38 @@ def configure_gemini_api():
         logger.error(f"Erreur lors de la configuration de l'API Gemini : {str(e)}")
         raise
 
-def generate_audio_from_text(text, output_dir='media/dictations'):
+def generate_audio_from_text(text, output_path):
     """
-    Génère un fichier audio à partir du texte de la dictée en utilisant gTTS et l'upload sur Cloudinary.
+    Génère un fichier audio à partir du texte de la dictée en utilisant gTTS.
     
     Args:
         text (str): Le texte à convertir en audio
-        output_dir (str): Le répertoire temporaire où sauvegarder le fichier audio
+        output_path (str): Le chemin complet où sauvegarder le fichier audio
         
     Returns:
         str: L'URL Cloudinary du fichier audio
     """
     try:
-        # Créer le répertoire de sortie s'il n'existe pas
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Générer un nom de fichier unique
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        audio_filename = f'dictation_{timestamp}.mp3'
-        audio_path = os.path.join(output_dir, audio_filename)
+        # S'assurer que le répertoire parent existe
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
         # Convertir le texte en audio avec gTTS
         tts = gTTS(text=text, lang='fr', slow=True)
-        tts.save(audio_path)
+        tts.save(output_path)
         
-        logger.info(f"Audio généré localement : {audio_path}")
+        logger.info(f"Audio généré localement : {output_path}")
         
         # Upload sur Cloudinary
         cloudinary_response = cloudinary.uploader.upload(
-            audio_path,
+            output_path,
             resource_type="video",
             folder="dictations",
-            public_id=audio_filename.replace('.mp3', '')
+            public_id=os.path.basename(output_path).replace('.mp3', '')
         )
         
         # Supprimer le fichier local
-        os.remove(audio_path)
+        if os.path.exists(output_path):
+            os.remove(output_path)
         
         logger.info(f"Audio uploadé sur Cloudinary : {cloudinary_response['secure_url']}")
         return cloudinary_response['secure_url']
@@ -158,23 +154,9 @@ def generate_dictation(params):
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
         
-        # Génération de l'audio
+        # Génération de l'audio avec le chemin complet
         audio_path = os.path.join(dictations_dir, f'dictation_{timestamp}.mp3')
-        generate_audio_from_text(result['text'], audio_path)
-        
-        # Upload vers Cloudinary
-        cloudinary_response = cloudinary.uploader.upload(
-            audio_path,
-            resource_type="video",
-            folder="dictations",
-            public_id=f"dictation_{timestamp}"
-        )
-        
-        # Construction de l'URL Cloudinary
-        audio_url = cloudinary_response['secure_url']
-        
-        # Nettoyage du fichier local
-        os.remove(audio_path)
+        audio_url = generate_audio_from_text(result['text'], audio_path)
         
         return {
             'id': 14,  # ID temporaire
