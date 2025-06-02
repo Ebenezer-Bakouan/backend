@@ -109,10 +109,13 @@ def generate_dictation(params):
             audio_file=f'dictations/dictation_{datetime.now().strftime("%Y%m%d_%H%M%S")}.mp3'
         )
         
+        # Construire l'URL Cloudinary
+        cloudinary_url = f"https://res.cloudinary.com/dlrudclbm/video/upload/v1/{dictation.audio_file}"
+        
         return {
             'id': dictation.id,
             'text': dictation_text,
-            'audio_files': audio_files,
+            'audio_files': [cloudinary_url],
             'title': dictation.title,
             'difficulty': dictation.difficulty
         }
