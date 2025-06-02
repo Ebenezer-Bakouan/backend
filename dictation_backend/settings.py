@@ -133,7 +133,8 @@ SIMPLE_JWT = {
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
-    'https://dicte-frontend.vercel.app'
+    'https://dicte-frontend.vercel.app',
+    'https://dicte-frontend-git-main-ebenezer-bakouan.vercel.app'
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
