@@ -2,11 +2,22 @@ import os
 import logging
 import google.generativeai as genai
 from datetime import datetime
-from gtts import gTTS # Revenir à gTTS
+from gtts import gTTS
 import json
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+from django.conf import settings
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
+
+# Configuration de Cloudinary
+cloudinary.config(
+    cloud_name=settings.CLOUDINARY_STORAGE['CLOUD_NAME'],
+    api_key=settings.CLOUDINARY_STORAGE['API_KEY'],
+    api_secret=settings.CLOUDINARY_STORAGE['API_SECRET']
+)
 
 def configure_gemini_api():
     """Configure l'API Gemini avec la clé API."""
@@ -19,14 +30,14 @@ def configure_gemini_api():
 
 def generate_audio_from_text(text, output_dir='media/dictations'):
     """
-    Génère un fichier audio unique à partir du texte de la dictée en utilisant gTTS.
+    Génère un fichier audio à partir du texte de la dictée en utilisant gTTS et l'upload sur Cloudinary.
     
     Args:
         text (str): Le texte à convertir en audio
-        output_dir (str): Le répertoire où sauvegarder le fichier audio
+        output_dir (str): Le répertoire temporaire où sauvegarder le fichier audio
         
     Returns:
-        list: Liste contenant le chemin du fichier audio généré
+        str: L'URL Cloudinary du fichier audio
     """
     try:
         # Créer le répertoire de sortie s'il n'existe pas
@@ -41,12 +52,25 @@ def generate_audio_from_text(text, output_dir='media/dictations'):
         tts = gTTS(text=text, lang='fr', slow=True)
         tts.save(audio_path)
         
-        logger.info(f"Audio généré : {audio_path}")
-        return [audio_path]
+        logger.info(f"Audio généré localement : {audio_path}")
+        
+        # Upload sur Cloudinary
+        cloudinary_response = cloudinary.uploader.upload(
+            audio_path,
+            resource_type="video",
+            folder="dictations",
+            public_id=audio_filename.replace('.mp3', '')
+        )
+        
+        # Supprimer le fichier local
+        os.remove(audio_path)
+        
+        logger.info(f"Audio uploadé sur Cloudinary : {cloudinary_response['secure_url']}")
+        return cloudinary_response['secure_url']
         
     except Exception as e:
         logger.error(f"Erreur lors de la génération de l'audio : {str(e)}")
-        return []
+        raise
 
 def generate_dictation(params):
     """
@@ -97,9 +121,9 @@ def generate_dictation(params):
         response = model.generate_content(prompt)
         dictation_text = response.text.strip()
 
-        # Génération de l'audio
-        audio_files = generate_audio_from_text(dictation_text)
-        logger.info(f"Fichiers audio générés : {audio_files}")
+        # Génération de l'audio et upload sur Cloudinary
+        audio_url = generate_audio_from_text(dictation_text)
+        logger.info(f"URL audio Cloudinary : {audio_url}")
         
         # Sauvegarder la dictée dans la base de données
         from .models import Dictation
@@ -113,14 +137,10 @@ def generate_dictation(params):
             audio_file=audio_filename
         )
         
-        # Construire l'URL Cloudinary
-        cloudinary_url = f"https://res.cloudinary.com/dlrudclbm/video/upload/{audio_filename}"
-        logger.info(f"URL Cloudinary générée : {cloudinary_url}")
-        
         return {
             'id': dictation.id,
             'text': dictation_text,
-            'audio_url': cloudinary_url,
+            'audio_url': audio_url,
             'title': dictation.title,
             'difficulty': dictation.difficulty
         }
