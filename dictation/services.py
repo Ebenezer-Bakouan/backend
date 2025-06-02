@@ -72,7 +72,6 @@ def generate_dictation(params):
         sujet = params.get('sujet', 'animaux')
         longueur = params.get('longueurTexte', 'moyen')
         type_contenu = params.get('typeContenu', 'narratif')
-        vitesse_lecture = params.get('vitesseLecture', 'normale') # Ce paramètre ne sera plus utilisé pour gTTS
         
         # Construction du prompt
         prompt = f"""Génère une dictée en français avec les caractéristiques suivantes :
@@ -92,86 +91,37 @@ def generate_dictation(params):
         - Sans explications supplémentaires
         
         IMPORTANT : Ne fournis QUE le texte de la dictée, sans commentaires ni explications. Le texte DOIT commencer par 'Dictée : [Un titre adapté] ' suivi du texte de la dictée."""
-        
-        # Génération du texte avec Gemini
+
+        # Génération de la dictée avec Gemini
         model = genai.GenerativeModel('gemini-2.0-flash')
         response = model.generate_content(prompt)
         dictation_text = response.text.strip()
-        
-        # Nettoyer le texte des astérisques pour l'audio et construire la chaîne audio avec répétitions
-        audio_parts = []
-        
-        # Tenter d'extraire le titre et le texte principal
-        lines = dictation_text.split('\n', 1)
-        title = ""
-        main_text = dictation_text
-        
-        if len(lines) > 0 and lines[0].strip().startswith('**Dictée :'):
-             # Nettoyer le titre des astérisques pour l'audio
-            title = lines[0].strip().replace('*', '').replace('Dictée :', '').strip()
-            main_text = lines[1].strip() if len(lines) > 1 else ""
-            audio_parts.append(f"Dictée : {title}.")
-            audio_parts.append(" ....\n") # Petite pause après le titre
-            
-        elif len(lines) > 0 and lines[0].strip().startswith('Dictée :'):
-             # Nettoyer le titre pour l'audio
-            title = lines[0].strip().replace('Dictée :', '').strip()
-            main_text = lines[1].strip() if len(lines) > 1 else ""
-            audio_parts.append(f"Dictée : {title}.")
-            audio_parts.append(" ....\n") # Petite pause après le titre
-        
-        text_to_split = main_text.replace('*', '').strip()
-        
-        # Diviser le texte principal en phrases (logique simplifiée)
-        sentences = []
-        current_sentence = ""
-        separators = ['. ', '! ', '? ', '... ', '.\n', '!\n', '?\n']
 
-        i = 0
-        while i < len(text_to_split):
-            found_separator = False
-            for sep in separators:
-                if text_to_split[i:i+len(sep)] == sep:
-                    if current_sentence.strip():
-                        sentences.append(current_sentence.strip() + sep.strip())
-                    current_sentence = ""
-                    i += len(sep)
-                    found_separator = True
-                    break
-            if not found_separator:
-                current_sentence += text_to_split[i]
-                i += 1
-
-        if current_sentence.strip():
-            sentences.append(current_sentence.strip())
-            
-        # Construire la chaîne audio avec répétitions et pauses
-        for i, sentence in enumerate(sentences):
-            if not sentence.strip():
-                continue
-            
-            words = sentence.split()
-            repetitions = 3 if len(words) > 15 else 2 # 3 répétitions si longue, 2 sinon
-            
-            repeated_sentence = (' ... ' if repetitions > 1 else '').join([sentence.strip()] * repetitions)
-            audio_parts.append(repeated_sentence)
-            audio_parts.append(" ....\n") # Pause plus longue entre les phrases
-
-        audio_text = " ".join(audio_parts).strip()
+        # Génération de l'audio
+        audio_files = generate_audio_from_text(dictation_text)
         
-        # Génération de l'audio (fichier unique avec gTTS)
-        audio_files = generate_audio_from_text(audio_text)
+        # Sauvegarder la dictée dans la base de données
+        from .models import Dictation
+        dictation = Dictation.objects.create(
+            title=f"Dictée sur {sujet}",
+            text=dictation_text,
+            difficulty=niveau,
+            audio_file=f'dictations/dictation_{datetime.now().strftime("%Y%m%d_%H%M%S")}.mp3'
+        )
         
         return {
-            'text': dictation_text, # Retourne le texte original avec formatage
-            'audio_files': audio_files
+            'id': dictation.id,
+            'text': dictation_text,
+            'audio_files': audio_files,
+            'title': dictation.title,
+            'difficulty': dictation.difficulty
         }
         
     except Exception as e:
         logger.error(f"Erreur lors de la génération de la dictée : {str(e)}")
-        raise 
+        raise
 
-def correct_dictation(user_text: str) -> dict:
+def correct_dictation(user_text: str, dictation_id: int) -> dict:
     """
     Corrige la dictée de l'utilisateur en utilisant Gemini.
     Retourne un dictionnaire contenant la note, les erreurs et la correction.
@@ -181,9 +131,17 @@ def correct_dictation(user_text: str) -> dict:
         genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
         model = genai.GenerativeModel('gemini-pro')
         
+        # Récupérer la dictée originale
+        from .models import Dictation, DictationAttempt
+        dictation = Dictation.objects.get(id=dictation_id)
+        
         # Prompt pour la correction
         prompt = f"""Tu es un professeur de français qui corrige une dictée. 
-        Voici le texte écrit par l'élève :
+        Voici le texte original :
+        
+        {dictation.text}
+        
+        Et voici le texte écrit par l'élève :
         
         {user_text}
         
@@ -211,7 +169,18 @@ def correct_dictation(user_text: str) -> dict:
         response = model.generate_content(prompt)
         correction_data = json.loads(response.text)
         
-        return correction_data
+        # Sauvegarder la tentative dans la base de données
+        attempt = DictationAttempt.objects.create(
+            dictation=dictation,
+            user_text=user_text,
+            score=correction_data['score'],
+            feedback=json.dumps(correction_data)
+        )
+        
+        return {
+            **correction_data,
+            'attempt_id': attempt.id
+        }
         
     except Exception as e:
         logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")

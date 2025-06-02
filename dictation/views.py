@@ -27,7 +27,7 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.0-pro')
 
 class DictationViewSet(viewsets.ModelViewSet):
-    queryset = Dictation.objects.all()
+    queryset = Dictation.objects.all().order_by('-created_at')
     serializer_class = DictationSerializer
 
     @action(detail=True, methods=['post'])
@@ -99,6 +99,30 @@ class DictationViewSet(viewsets.ModelViewSet):
             'score': score,
             'feedback': feedback
         })
+
+    @action(detail=True, methods=['get'])
+    def attempts(self, request, pk=None):
+        dictation = self.get_object()
+        attempts = DictationAttempt.objects.filter(dictation=dictation).order_by('-created_at')
+        serializer = DictationAttemptSerializer(attempts, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def history(self, request):
+        dictations = self.get_queryset()
+        serializer = self.get_serializer(dictations, many=True)
+        return Response(serializer.data)
+
+class DictationAttemptViewSet(viewsets.ModelViewSet):
+    queryset = DictationAttempt.objects.all().order_by('-created_at')
+    serializer_class = DictationAttemptSerializer
+
+    @action(detail=False, methods=['get'])
+    def my_attempts(self, request):
+        # Ici, vous pourriez filtrer par utilisateur quand l'authentification sera implémentée
+        attempts = self.get_queryset()
+        serializer = self.get_serializer(attempts, many=True)
+        return Response(serializer.data)
 
 class DictationView(APIView):
     def get(self, request):

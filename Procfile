@@ -1,0 +1,1 @@
+web: gunicorn dictation_backend.wsgi:application 
