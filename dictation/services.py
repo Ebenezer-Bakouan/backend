@@ -99,18 +99,23 @@ def generate_dictation(params):
 
         # Génération de l'audio
         audio_files = generate_audio_from_text(dictation_text)
+        logger.info(f"Fichiers audio générés : {audio_files}")
         
         # Sauvegarder la dictée dans la base de données
         from .models import Dictation
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        audio_filename = f'dictations/dictation_{timestamp}.mp3'
+        
         dictation = Dictation.objects.create(
             title=f"Dictée sur {sujet}",
             text=dictation_text,
             difficulty=niveau,
-            audio_file=f'dictations/dictation_{datetime.now().strftime("%Y%m%d_%H%M%S")}.mp3'
+            audio_file=audio_filename
         )
         
         # Construire l'URL Cloudinary
-        cloudinary_url = f"https://res.cloudinary.com/dlrudclbm/video/upload/v1/{dictation.audio_file}"
+        cloudinary_url = f"https://res.cloudinary.com/dlrudclbm/video/upload/{audio_filename}"
+        logger.info(f"URL Cloudinary générée : {cloudinary_url}")
         
         return {
             'id': dictation.id,
