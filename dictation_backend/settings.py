@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'drf_yasg',
+    'cloudinary_storage',
     
     # Local apps
     'dictation',
@@ -167,6 +168,13 @@ CELERY_TIMEZONE = TIME_ZONE
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Cloudinary settings
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': env('CLOUDINARY_CLOUD_NAME', default='dlrudclbm'),
+    'API_KEY': env('CLOUDINARY_API_KEY', default='218112187291689'),
+    'API_SECRET': env('CLOUDINARY_API_SECRET', default='MQjA7rf1Ofjm8E0RTkn16LQj5kw'),
+}
+
 # Configuration du logging
 LOGGING = {
     'version': 1,
@@ -197,4 +205,7 @@ LOGGING = {
 }
 
 # Gemini API settings
-GEMINI_API_KEY = 'AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI' 
+GEMINI_API_KEY = 'AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI'
+
+# Media files
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage' 
