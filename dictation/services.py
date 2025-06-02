@@ -95,42 +95,58 @@ def generate_dictation(params):
         
         # Construction du prompt pour Gemini
         prompt = f"""
-        En tant que professeur de français, créez une dictée adaptée aux critères suivants :
-        
+        Tu es un professeur de français qui crée des dictées. Réponds UNIQUEMENT avec un objet JSON valide, sans aucun autre texte.
+
+        Crée une dictée avec ces critères :
         - Âge de l'élève : {age} ans
         - Niveau scolaire : {niveau_scolaire}
         - Objectif d'apprentissage : {objectif}
         - Difficultés spécifiques : {difficultes}
         - Durée estimée : {temps} minutes
-        
-        Règles importantes :
-        1. Créez un texte COHÉRENT et NATUREL, comme un extrait de livre ou un article
-        2. N'utilisez AUCUN marqueur de formatage (pas d'astérisques, de gras, d'italique, etc.)
-        3. Le texte doit être fluide et agréable à écouter
-        4. Incluez des mots qui correspondent à l'objectif d'apprentissage
-        5. Adaptez la longueur et la complexité à l'âge et au niveau de l'élève
-        6. Évitez les phrases trop longues ou complexes
-        7. Utilisez un vocabulaire adapté au niveau scolaire
-        8. IMPORTANT : Répétez chaque phrase longue (plus de 10 mots) 3 fois
-        9. IMPORTANT : Répétez chaque phrase courte (10 mots ou moins) 2 fois
-        
-        Format de réponse souhaité :
+
+        Règles pour le texte :
+        1. Texte COHÉRENT et NATUREL
+        2. AUCUN marqueur de formatage
+        3. Phrases longues (>10 mots) répétées 3 fois
+        4. Phrases courtes (≤10 mots) répétées 2 fois
+        5. Vocabulaire adapté au niveau
+        6. Phrases simples et claires
+
+        Format de réponse OBLIGATOIRE (réponds UNIQUEMENT avec ce JSON) :
         {{
-            "text": "Le texte de la dictée, avec les répétitions des phrases. Exemple : 'Le chat dort. Le chat dort. La souris mange du fromage. La souris mange du fromage.'",
-            "title": "Un titre court et descriptif",
-            "difficulty": "facile/moyen/difficile"
+            "text": "Le texte de la dictée avec les répétitions. Exemple : 'Le chat dort. Le chat dort. La souris mange du fromage. La souris mange du fromage.'",
+            "title": "Titre court et descriptif",
+            "difficulty": "facile"
         }}
-        
-        IMPORTANT : 
-        - Le texte doit être parfaitement lisible et naturel
-        - Répétez les phrases exactement de la même manière
-        - Ne mettez pas de marqueurs ou d'indications de répétition
         """
         
         # Génération de la dictée avec Gemini
         model = genai.GenerativeModel('gemini-2.0-flash')
         response = model.generate_content(prompt)
-        result = json.loads(response.text)
+        
+        # Validation et parsing de la réponse JSON
+        try:
+            # Nettoyage de la réponse pour s'assurer qu'elle est un JSON valide
+            response_text = response.text.strip()
+            if not response_text.startswith('{'):
+                response_text = response_text[response_text.find('{'):]
+            if not response_text.endswith('}'):
+                response_text = response_text[:response_text.rfind('}')+1]
+            
+            result = json.loads(response_text)
+            
+            # Validation des champs requis
+            required_fields = ['text', 'title', 'difficulty']
+            if not all(field in result for field in required_fields):
+                raise ValueError("Réponse JSON incomplète")
+                
+        except json.JSONDecodeError as e:
+            logger.error(f"Erreur de parsing JSON : {str(e)}")
+            logger.error(f"Réponse brute de Gemini : {response.text}")
+            return {"error": "Erreur de génération de la dictée"}
+        except Exception as e:
+            logger.error(f"Erreur lors du traitement de la réponse : {str(e)}")
+            return {"error": str(e)}
         
         # Création du dossier pour les dictées s'il n'existe pas
         dictations_dir = os.path.join(settings.MEDIA_ROOT, 'dictations')
