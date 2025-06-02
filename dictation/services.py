@@ -115,7 +115,7 @@ def generate_dictation(params):
         return {
             'id': dictation.id,
             'text': dictation_text,
-            'audio_files': [cloudinary_url],
+            'audio_url': cloudinary_url,
             'title': dictation.title,
             'difficulty': dictation.difficulty
         }
