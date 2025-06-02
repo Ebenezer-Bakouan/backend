@@ -1,0 +1,30 @@
+# Django et DRF
+Django==5.0.2
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+django-filter==23.5
+django-environ==0.11.2
+
+# Base de données
+psycopg2-binary==2.9.9
+dj-database-url==2.1.0
+
+# Authentification
+djangorestframework-simplejwt==5.3.1
+
+# Tâches asynchrones
+celery==5.3.6
+redis==5.0.1
+
+# Production
+gunicorn==21.2.0
+whitenoise==6.6.0
+
+# Développement
+black==24.1.1
+flake8==7.0.0
+pytest==8.0.0
+pytest-django==4.7.0
+
+# Documentation
+drf-yasg==1.21.7 
