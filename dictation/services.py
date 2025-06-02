@@ -86,68 +86,91 @@ def generate_dictation(params):
         # Configuration de l'API Gemini
         configure_gemini_api()
         
-        # Récupération des paramètres
-        age = params.get('age', 15)
+        # Extraction des paramètres
+        age = params.get('age', '12')
         niveau_scolaire = params.get('niveauScolaire', 'Étudiant')
-        objectif = params.get('objectifApprentissage', 'accord')
-        difficultes = params.get('difficultesSpecifiques', 'homophone')
-        temps = params.get('tempsDisponible', 15)
-        niveau = params.get('niveau', 'moyen')
-        sujet = params.get('sujet', 'animaux')
-        longueur = params.get('longueurTexte', 'moyen')
-        type_contenu = params.get('typeContenu', 'narratif')
+        objectif = params.get('objectifApprentissage', 'orthographe')
+        difficultes = params.get('difficultesSpecifiques', '')
+        temps = params.get('tempsDisponible', '10')
         
-        # Construction du prompt
-        prompt = f"""Génère une dictée en français avec les caractéristiques suivantes :
-        - Niveau : {niveau} (adapté à un {niveau_scolaire} de {age} ans)
+        # Construction du prompt pour Gemini
+        prompt = f"""
+        En tant que professeur de français, créez une dictée adaptée aux critères suivants :
+        
+        - Âge de l'élève : {age} ans
+        - Niveau scolaire : {niveau_scolaire}
         - Objectif d'apprentissage : {objectif}
-        - Difficultés spécifiques à travailler : {difficultes}
-        - Durée : {temps} minutes
-        - Sujet : {sujet}
-        - Longueur : {longueur}
-        - Type de contenu : {type_contenu}
+        - Difficultés spécifiques : {difficultes}
+        - Durée estimée : {temps} minutes
         
-        La dictée doit être :
-        - Adaptée au niveau spécifié
-        - Claire et bien structurée
-        - Intéressante et engageante
-        - Avec une ponctuation appropriée
-        - Sans explications supplémentaires
+        Règles importantes :
+        1. Créez un texte COHÉRENT et NATUREL, comme un extrait de livre ou un article
+        2. N'utilisez AUCUN marqueur de formatage (pas d'astérisques, de gras, d'italique, etc.)
+        3. Le texte doit être fluide et agréable à écouter
+        4. Incluez des mots qui correspondent à l'objectif d'apprentissage
+        5. Adaptez la longueur et la complexité à l'âge et au niveau de l'élève
+        6. Évitez les phrases trop longues ou complexes
+        7. Utilisez un vocabulaire adapté au niveau scolaire
+        8. IMPORTANT : Répétez chaque phrase longue (plus de 10 mots) 3 fois
+        9. IMPORTANT : Répétez chaque phrase courte (10 mots ou moins) 2 fois
         
-        IMPORTANT : Ne fournis QUE le texte de la dictée, sans commentaires ni explications. Le texte DOIT commencer par 'Dictée : [Un titre adapté] ' suivi du texte de la dictée."""
-
+        Format de réponse souhaité :
+        {{
+            "text": "Le texte de la dictée, avec les répétitions des phrases. Exemple : 'Le chat dort. Le chat dort. La souris mange du fromage. La souris mange du fromage.'",
+            "title": "Un titre court et descriptif",
+            "difficulty": "facile/moyen/difficile"
+        }}
+        
+        IMPORTANT : 
+        - Le texte doit être parfaitement lisible et naturel
+        - Répétez les phrases exactement de la même manière
+        - Ne mettez pas de marqueurs ou d'indications de répétition
+        """
+        
         # Génération de la dictée avec Gemini
         model = genai.GenerativeModel('gemini-2.0-flash')
         response = model.generate_content(prompt)
-        dictation_text = response.text.strip()
-
-        # Génération de l'audio et upload sur Cloudinary
-        audio_url = generate_audio_from_text(dictation_text)
-        logger.info(f"URL audio Cloudinary : {audio_url}")
+        result = json.loads(response.text)
         
-        # Sauvegarder la dictée dans la base de données
-        from .models import Dictation
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        audio_filename = f'dictations/dictation_{timestamp}.mp3'
+        # Création du dossier pour les dictées s'il n'existe pas
+        dictations_dir = os.path.join(settings.MEDIA_ROOT, 'dictations')
+        os.makedirs(dictations_dir, exist_ok=True)
         
-        dictation = Dictation.objects.create(
-            title=f"Dictée sur {sujet}",
-            text=dictation_text,
-            difficulty=niveau,
-            audio_file=audio_filename
+        # Sauvegarde du texte dans un fichier JSON
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        json_path = os.path.join(dictations_dir, f'dictation_{timestamp}.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        
+        # Génération de l'audio
+        audio_path = os.path.join(dictations_dir, f'dictation_{timestamp}.mp3')
+        generate_audio_from_text(result['text'], audio_path)
+        
+        # Upload vers Cloudinary
+        cloudinary_response = cloudinary.uploader.upload(
+            audio_path,
+            resource_type="video",
+            folder="dictations",
+            public_id=f"dictation_{timestamp}"
         )
         
+        # Construction de l'URL Cloudinary
+        audio_url = cloudinary_response['secure_url']
+        
+        # Nettoyage du fichier local
+        os.remove(audio_path)
+        
         return {
-            'id': dictation.id,
-            'text': dictation_text,
+            'id': 14,  # ID temporaire
+            'text': result['text'],
             'audio_url': audio_url,
-            'title': dictation.title,
-            'difficulty': dictation.difficulty
+            'title': result['title'],
+            'difficulty': result['difficulty']
         }
         
     except Exception as e:
         logger.error(f"Erreur lors de la génération de la dictée : {str(e)}")
-        raise
+        return {"error": str(e)}
 
 def correct_dictation(user_text: str, dictation_id: int) -> dict:
     """
