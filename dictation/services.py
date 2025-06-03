@@ -196,7 +196,7 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         
         # Prompt pour la correction
         prompt = f"""Tu es un professeur de français qui corrige une dictée. 
-        Voici le texte original :
+        Voici le texte original de la dictée que tu as généré précédemment :
         
         {dictation.text}
         
@@ -204,15 +204,19 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         
         {user_text}
         
-        Ta tâche est de :
-        1. Comparer ce texte avec la dictée originale
-        2. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
-        3. Attribuer une note sur 100 en fonction de la qualité du texte
-        4. Fournir une liste détaillée des erreurs
-        5. Fournir le texte corrigé
+        IMPORTANT : Si le texte de l'élève est vide ou presque vide, tu DOIS donner une note de 0/100.
         
-        Règles de notation :
-        - Si le texte est vide ou très incomplet (< 10% du texte original) : 0/100
+        Ta tâche est de :
+        1. Vérifier d'abord si le texte de l'élève est vide ou presque vide
+        2. Si le texte est vide ou presque vide (< 10% du texte original), donner une note de 0/100
+        3. Sinon, comparer le texte avec la dictée originale
+        4. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
+        5. Attribuer une note sur 100 en fonction de la qualité du texte
+        6. Fournir une liste détaillée des erreurs
+        7. Fournir le texte corrigé
+        
+        Règles de notation STRICTES :
+        - Si le texte est vide ou très incomplet (< 10% du texte original) : OBLIGATOIREMENT 0/100
         - Pour chaque mot manquant : -5 points
         - Pour chaque erreur d'orthographe : -2 points
         - Pour chaque erreur de grammaire : -3 points
@@ -231,11 +235,19 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
             "error_count": <nombre total d'erreurs>
         }}
         
-        IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
+        IMPORTANT : 
+        - Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires
+        - Si le texte est vide ou presque vide, la note DOIT être 0/100
+        - Vérifie bien que le texte de l'élève correspond à la dictée que tu as générée"""
         
         # Génération de la correction avec Gemini
         response = model.generate_content(prompt)
         correction_data = json.loads(response.text)
+        
+        # Vérification supplémentaire pour s'assurer que le score est 0 si le texte est vide
+        if not user_text or len(user_text.strip()) < len(dictation.text) * 0.1:
+            correction_data['score'] = 0
+            correction_data['errors'] = ['Le texte est vide ou trop court pour être évalué']
         
         # Sauvegarder la tentative dans la base de données
         attempt = DictationAttempt.objects.create(
