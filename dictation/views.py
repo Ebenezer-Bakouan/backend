@@ -183,8 +183,8 @@ def correct_dictation_view(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            user_text = data.get('text', '').strip()
-            dictation_id = data.get('dictation_id', 14)  # Utiliser l'ID de la dictée
+            user_text = data.get('user_text', '').strip()
+            dictation_id = data.get('dictation_id', 14)
             logger.info(f"Texte reçu : {user_text}")
             
             # Utiliser la fonction correct_dictation du service
