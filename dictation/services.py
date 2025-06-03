@@ -232,7 +232,7 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         
         # Prompt pour la correction
         prompt = f"""Tu es un professeur de français qui corrige une dictée. 
-        Voici le texte original de la dictée :
+        Voici le texte original de la dictée (EXACTEMENT comme il a été lu dans l'audio) :
         
         {dictation.text}
         
@@ -241,17 +241,19 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         {user_text}
         
         Ta tâche est de :
-        1. Comparer le texte avec la dictée originale
+        1. Comparer le texte avec la dictée originale MOT POUR MOT
         2. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
         3. Attribuer une note sur 100 en fonction de la qualité du texte
         4. Fournir une liste détaillée des erreurs
-        5. Fournir le texte corrigé
+        5. Fournir le texte corrigé EXACTEMENT comme dans l'audio
         
         Règles de notation :
         - Pour chaque mot manquant : -5 points
         - Pour chaque erreur d'orthographe : -2 points
         - Pour chaque erreur de grammaire : -3 points
         - Pour chaque erreur de ponctuation : -1 point
+        
+        IMPORTANT : Le texte corrigé doit être EXACTEMENT le même que le texte original, sans aucune modification.
         
         Réponds au format JSON suivant :
         {{
@@ -261,7 +263,7 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
                 "Description de l'erreur 2",
                 ...
             ],
-            "correction": "Texte complet corrigé",
+            "correction": "Texte complet corrigé (EXACTEMENT comme dans l'audio)",
             "total_words": <nombre total de mots dans le texte original>,
             "error_count": <nombre total d'erreurs>
         }}
