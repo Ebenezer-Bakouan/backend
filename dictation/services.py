@@ -176,27 +176,63 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
     Retourne un dictionnaire contenant la note, les erreurs et la correction.
     """
     try:
-        # Configuration de Gemini
-        genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
-        model = genai.GenerativeModel('gemini-pro')
-        
         # Récupérer la dictée originale
         from .models import Dictation, DictationAttempt
         dictation = Dictation.objects.get(id=dictation_id)
         
-        # Vérifier si le texte de l'utilisateur est vide ou trop court
-        if not user_text or len(user_text.strip()) < len(dictation.text) * 0.1:  # Moins de 10% du texte original
-            return {
+        # Vérification STRICTE du texte vide
+        if not user_text or not user_text.strip():
+            result = {
                 'score': 0,
-                'errors': ['Le texte est vide ou trop court pour être évalué'],
+                'errors': ['Le texte est vide. Veuillez écrire la dictée.'],
                 'correction': dictation.text,
                 'total_words': len(dictation.text.split()),
                 'error_count': len(dictation.text.split())
             }
+            
+            # Sauvegarder la tentative dans la base de données
+            attempt = DictationAttempt.objects.create(
+                dictation=dictation,
+                user_text=user_text,
+                score=0,
+                feedback=json.dumps(result)
+            )
+            
+            return {
+                **result,
+                'attempt_id': attempt.id
+            }
+        
+        # Vérification de la longueur minimale
+        if len(user_text.strip()) < len(dictation.text) * 0.1:
+            result = {
+                'score': 0,
+                'errors': ['Le texte est trop court. Veuillez écrire la dictée complète.'],
+                'correction': dictation.text,
+                'total_words': len(dictation.text.split()),
+                'error_count': len(dictation.text.split())
+            }
+            
+            # Sauvegarder la tentative dans la base de données
+            attempt = DictationAttempt.objects.create(
+                dictation=dictation,
+                user_text=user_text,
+                score=0,
+                feedback=json.dumps(result)
+            )
+            
+            return {
+                **result,
+                'attempt_id': attempt.id
+            }
+        
+        # Configuration de Gemini
+        genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
+        model = genai.GenerativeModel('gemini-pro')
         
         # Prompt pour la correction
         prompt = f"""Tu es un professeur de français qui corrige une dictée. 
-        Voici le texte original de la dictée que tu as généré précédemment :
+        Voici le texte original de la dictée :
         
         {dictation.text}
         
@@ -204,19 +240,14 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         
         {user_text}
         
-        IMPORTANT : Si le texte de l'élève est vide ou presque vide, tu DOIS donner une note de 0/100.
-        
         Ta tâche est de :
-        1. Vérifier d'abord si le texte de l'élève est vide ou presque vide
-        2. Si le texte est vide ou presque vide (< 10% du texte original), donner une note de 0/100
-        3. Sinon, comparer le texte avec la dictée originale
-        4. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
-        5. Attribuer une note sur 100 en fonction de la qualité du texte
-        6. Fournir une liste détaillée des erreurs
-        7. Fournir le texte corrigé
+        1. Comparer le texte avec la dictée originale
+        2. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
+        3. Attribuer une note sur 100 en fonction de la qualité du texte
+        4. Fournir une liste détaillée des erreurs
+        5. Fournir le texte corrigé
         
-        Règles de notation STRICTES :
-        - Si le texte est vide ou très incomplet (< 10% du texte original) : OBLIGATOIREMENT 0/100
+        Règles de notation :
         - Pour chaque mot manquant : -5 points
         - Pour chaque erreur d'orthographe : -2 points
         - Pour chaque erreur de grammaire : -3 points
@@ -235,19 +266,11 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
             "error_count": <nombre total d'erreurs>
         }}
         
-        IMPORTANT : 
-        - Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires
-        - Si le texte est vide ou presque vide, la note DOIT être 0/100
-        - Vérifie bien que le texte de l'élève correspond à la dictée que tu as générée"""
+        IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
         
         # Génération de la correction avec Gemini
         response = model.generate_content(prompt)
         correction_data = json.loads(response.text)
-        
-        # Vérification supplémentaire pour s'assurer que le score est 0 si le texte est vide
-        if not user_text or len(user_text.strip()) < len(dictation.text) * 0.1:
-            correction_data['score'] = 0
-            correction_data['errors'] = ['Le texte est vide ou trop court pour être évalué']
         
         # Sauvegarder la tentative dans la base de données
         attempt = DictationAttempt.objects.create(
