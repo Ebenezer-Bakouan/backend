@@ -237,7 +237,7 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         
         # Configuration de Gemini
         genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.0-pro')
         
         # Prompt pour la correction
         prompt = f"""Tu es un professeur de français qui corrige une dictée. 
