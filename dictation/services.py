@@ -184,6 +184,16 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         from .models import Dictation, DictationAttempt
         dictation = Dictation.objects.get(id=dictation_id)
         
+        # Vérifier si le texte de l'utilisateur est vide ou trop court
+        if not user_text or len(user_text.strip()) < len(dictation.text) * 0.1:  # Moins de 10% du texte original
+            return {
+                'score': 0,
+                'errors': ['Le texte est vide ou trop court pour être évalué'],
+                'correction': dictation.text,
+                'total_words': len(dictation.text.split()),
+                'error_count': len(dictation.text.split())
+            }
+        
         # Prompt pour la correction
         prompt = f"""Tu es un professeur de français qui corrige une dictée. 
         Voici le texte original :
@@ -201,6 +211,13 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         4. Fournir une liste détaillée des erreurs
         5. Fournir le texte corrigé
         
+        Règles de notation :
+        - Si le texte est vide ou très incomplet (< 10% du texte original) : 0/100
+        - Pour chaque mot manquant : -5 points
+        - Pour chaque erreur d'orthographe : -2 points
+        - Pour chaque erreur de grammaire : -3 points
+        - Pour chaque erreur de ponctuation : -1 point
+        
         Réponds au format JSON suivant :
         {{
             "score": <note sur 100>,
@@ -209,7 +226,9 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
                 "Description de l'erreur 2",
                 ...
             ],
-            "correction": "Texte complet corrigé"
+            "correction": "Texte complet corrigé",
+            "total_words": <nombre total de mots dans le texte original>,
+            "error_count": <nombre total d'erreurs>
         }}
         
         IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
