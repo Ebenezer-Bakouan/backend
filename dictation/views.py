@@ -184,87 +184,14 @@ def correct_dictation_view(request):
         try:
             data = json.loads(request.body)
             user_text = data.get('text', '').strip()
+            dictation_id = data.get('dictation_id', 14)  # Utiliser l'ID de la dictée
             logger.info(f"Texte reçu : {user_text}")
             
-            # Récupérer le texte original de la dernière dictée générée
-            dictations_dir = os.path.join(settings.MEDIA_ROOT, 'dictations')
-            latest_dictation = None
-            latest_time = None
+            # Utiliser la fonction correct_dictation du service
+            result = correct_dictation(user_text, dictation_id)
+            logger.info(f"Résultat de la correction : {result}")
             
-            for filename in os.listdir(dictations_dir):
-                if filename.endswith('.json'):
-                    file_path = os.path.join(dictations_dir, filename)
-                    file_time = os.path.getmtime(file_path)
-                    if latest_time is None or file_time > latest_time:
-                        latest_time = file_time
-                        latest_dictation = file_path
-            
-            if not latest_dictation:
-                logger.error("Aucune dictée trouvée")
-                return JsonResponse({'error': 'Aucune dictée trouvée'}, status=404)
-            
-            with open(latest_dictation, 'r', encoding='utf-8') as f:
-                dictation_data = json.load(f)
-                original_text = dictation_data.get('text', '').strip()
-                logger.info(f"Texte original : {original_text}")
-
-            # Utiliser Gemini pour corriger la dictée
-            prompt = f"""
-            En tant que professeur de français, corrigez cette dictée :
-
-            Texte original : {original_text}
-            Texte de l'élève : {user_text}
-
-            Donnez votre réponse au format JSON suivant :
-            {{
-                "score": [note sur 100],
-                "errors": [
-                    "erreur 1",
-                    "erreur 2",
-                    ...
-                ],
-                "correction": "texte corrigé complet",
-                "total_words": [nombre total de mots],
-                "error_count": [nombre d'erreurs]
-            }}
-
-            Soyez précis dans la correction et expliquez clairement chaque erreur.
-            """
-
-            try:
-                response = model.generate_content(prompt)
-                result = json.loads(response.text)
-                logger.info(f"Résultat de la correction : {result}")
-                
-                return JsonResponse({
-                    'score': result['score'],
-                    'errors': result['errors'],
-                    'correction': result['correction'],
-                    'total_words': result['total_words'],
-                    'error_count': result['error_count']
-                })
-            except Exception as e:
-                logger.error(f"Erreur Gemini : {str(e)}")
-                # Fallback à la méthode simple si Gemini échoue
-                user_words = user_text.lower().split()
-                original_words = original_text.lower().split()
-                
-                errors = []
-                for i, (user_word, original_word) in enumerate(zip(user_words, original_words)):
-                    if user_word != original_word:
-                        errors.append(f"Mot {i+1}: '{user_word}' au lieu de '{original_word}'")
-                
-                total_words = len(original_words)
-                error_count = len(errors)
-                score = max(0, 100 - (error_count * 5))
-                
-                return JsonResponse({
-                    'score': score,
-                    'errors': errors,
-                    'correction': original_text,
-                    'total_words': total_words,
-                    'error_count': error_count
-                })
+            return JsonResponse(result)
             
         except Exception as e:
             logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")
