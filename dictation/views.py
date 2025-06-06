@@ -286,9 +286,12 @@ def generate_dictation_view(request):
 @csrf_exempt
 def correct_dictation_view(request):
     logger.info("Début de la correction de la dictée")
+    logger.info(f"Méthode de la requête : {request.method}")
+    logger.info(f"Headers de la requête : {request.headers}")
+    logger.info(f"Corps de la requête brut : {request.body}")
+    
     if request.method == 'POST':
         try:
-            logger.info(f"Corps de la requête : {request.body}")
             data = json.loads(request.body)
             logger.info(f"Données parsées : {data}")
             user_text = data.get('user_text', '').strip()
