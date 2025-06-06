@@ -91,30 +91,35 @@ def generate_dictation(params):
         
         # Construction du prompt pour Gemini
         prompt = f"""
-        Tu es un professeur de français qui crée des dictées. Réponds UNIQUEMENT avec un objet JSON valide, sans aucun autre texte.
+Tu es un professeur de français spécialiste de l'enseignement en Afrique de l'Ouest, notamment au Burkina Faso. Tu conçois des dictées vivantes et instructives pour des élèves burkinabè. Réponds UNIQUEMENT avec un OBJET JSON VALIDE. Ne donne aucun autre texte.
 
-        Crée une dictée avec ces critères :
-        - Âge de l'élève : {age} ans
-        - Niveau scolaire : {niveau_scolaire}
-        - Objectif d'apprentissage : {objectif}
-        - Difficultés spécifiques : {difficultes}
-        - Durée estimée : {temps} minutes
+### Informations sur l'élève
+- Âge : {age} ans
+- Niveau scolaire : {niveau_scolaire}
+- Objectif d'apprentissage : {objectif}
+- Difficultés spécifiques à travailler : {difficultes}
+- Durée estimée : {temps} minutes
 
-        Règles pour le texte :
-        1. Texte COHÉRENT et NATUREL
-        2. AUCUN marqueur de formatage
-        3. Phrases longues (>10 mots) répétées 3 fois
-        4. Phrases courtes (≤10 mots) répétées 2 fois
-        5. Vocabulaire adapté au niveau
-        6. Phrases simples et claires
+### Objectif de la dictée
 
-        Format de réponse OBLIGATOIRE (réponds UNIQUEMENT avec ce JSON) :
-        {{
-            "text": "Le texte de la dictée avec les répétitions. Exemple : 'Le chat dort. Le chat dort. La souris mange du fromage. La souris mange du fromage.'",
-            "title": "Titre court et descriptif",
-            "difficulty": "facile"
-        }}
-        """
+1. **Créer un petit récit cohérent, captivant et authentique**, inspiré d'un contexte africain (de préférence burkinabè).
+2. Le récit doit se dérouler dans un **village, une ville ou une région du Burkina Faso**, ou faire référence à une **coutume locale, un animal de la savane, un métier traditionnel, une fête ou une scène de la vie quotidienne**.
+3. Le texte doit intégrer un **savoir culturel ou lexical** : découverte d'un animal (ex : le fennec, le pangolin), d'un métier (ex : potier, forgeron), d'un lieu (ex : Bobo-Dioulasso, Gorom-Gorom), ou d'une pratique (ex : marché, cuisine, danse, masques, contes…).
+4. Ajouter **au moins 3 mots peu fréquents ou spécifiques à la culture locale ou à la nature**, mais compréhensibles par le contexte.
+5. Style fluide, phrases simples et syntaxe correcte, adaptées au niveau indiqué.
+6. Répétition pédagogique :
+   - Phrases **longues** (>10 mots) → **répétées 3 fois**
+   - Phrases **courtes** (≤10 mots) → **répétées 2 fois**
+   - Les répétitions doivent **sembler naturelles**, comme dans un conte ou un rappel narratif.
+7. Ne surtout pas utiliser de formatage, retour à la ligne ou texte explicatif.
+
+### Format OBLIGATOIRE de sortie
+{{
+  "text": "Texte intégral de la dictée avec répétitions intégrées dans un style fluide.",
+  "title": "Titre court, en lien avec le thème culturel ou naturel burkinabè",
+  "difficulty": "facile" // ou "moyenne" ou "difficile", selon le contenu généré
+}}
+"""
         
         # Génération de la dictée avec Gemini
         model = genai.GenerativeModel('gemini-2.0-flash')
@@ -201,7 +206,11 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
             logger.warning("Texte vide détecté")
             result = {
                 'score': 0,
-                'errors': ['Le texte est vide. Veuillez écrire la dictée.'],
+                'errors': [{
+                    'word': '',
+                    'correction': '',
+                    'description': 'Le texte est vide. Veuillez écrire la dictée.'
+                }],
                 'correction': dictation.text,
                 'total_words': len(dictation.text.split()),
                 'error_count': len(dictation.text.split())
@@ -225,7 +234,11 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
             logger.warning(f"Texte trop court : {len(user_text.strip())} < {len(dictation.text) * 0.1}")
             result = {
                 'score': 0,
-                'errors': ['Le texte est trop court. Veuillez écrire la dictée complète.'],
+                'errors': [{
+                    'word': '',
+                    'correction': '',
+                    'description': 'Le texte est trop court. Veuillez écrire la dictée complète.'
+                }],
                 'correction': dictation.text,
                 'total_words': len(dictation.text.split()),
                 'error_count': len(dictation.text.split())
@@ -249,44 +262,52 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         model = genai.GenerativeModel('gemini-1.0-pro')
         
         # Prompt pour la correction
-        prompt = f"""Tu es un professeur de français qui corrige une dictée. 
-        Voici le texte original de la dictée (EXACTEMENT comme il a été lu dans l'audio) :
-        
-        {dictation.text}
-        
-        Et voici le texte écrit par l'élève :
-        
-        {user_text}
-        
-        Ta tâche est de :
-        1. Comparer le texte avec la dictée originale MOT POUR MOT
-        2. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
-        3. Attribuer une note sur 100 en fonction de la qualité du texte
-        4. Fournir une liste détaillée des erreurs
-        5. Fournir le texte corrigé EXACTEMENT comme dans l'audio
-        
-        Règles de notation :
-        - Pour chaque mot manquant : -5 points
-        - Pour chaque erreur d'orthographe : -2 points
-        - Pour chaque erreur de grammaire : -3 points
-        - Pour chaque erreur de ponctuation : -1 point
-        
-        IMPORTANT : Le texte corrigé doit être EXACTEMENT le même que le texte original, sans aucune modification.
-        
-        Réponds au format JSON suivant :
-        {{
-            "score": <note sur 100>,
-            "errors": [
-                "Description de l'erreur 1",
-                "Description de l'erreur 2",
-                ...
-            ],
-            "correction": "Texte complet corrigé (EXACTEMENT comme dans l'audio)",
-            "total_words": <nombre total de mots dans le texte original>,
-            "error_count": <nombre total d'erreurs>
-        }}
-        
-        IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
+        prompt = f"""
+Tu es un professeur de français expérimenté qui corrige les dictées d'élèves en Afrique francophone (Burkina Faso en particulier). Tu fais une correction juste, logique et bienveillante.
+
+Voici le texte ORIGINAL de la dictée, exactement comme lu dans l'audio :
+
+--- 
+{dictation.text}
+---
+
+Et voici ce qu'a écrit l'élève :
+
+---
+{user_text}
+---
+
+Ta mission est de :
+1. Comparer le texte de l'élève au texte original, non pas mot à mot, mais en tenant compte du **sens global**, du **contexte**, de la **syntaxe** et de la **logique grammaticale**.
+2. Ne pénalise pas toute la suite du texte si l'élève a juste oublié ou ajouté un mot. Ne sois pas rigide : si l'élève a suivi le fil logique, conserve les points quand c'est justifié.
+3. Identifie uniquement les **vraies erreurs** (orthographe, conjugaison, accord, ponctuation, grammaire).
+4. Attribue une note sur 100 selon ce barème :
+   - Mot clairement manquant : -5 points
+   - Erreur d'orthographe : -2 points
+   - Erreur de grammaire ou d'accord : -3 points
+   - Erreur de ponctuation : -1 point
+   - Mauvaise construction ou confusion sémantique : -3 points
+   ⚠️ Si une erreur entraîne d'autres en chaîne, ne retire des points qu'une seule fois (pas de pénalité cumulative injuste).
+5. Reconstitue le texte **corrigé**, exactement comme dans la dictée originale.
+6. Garde une **approche pédagogique**, pas robotique.
+
+Réponds uniquement avec un JSON strictement valide, au format suivant :
+{{
+  "score": <note sur 100>,
+  "errors": [
+    {{
+      "word": "mot incorrect écrit par l'élève",
+      "correction": "correction correcte",
+      "description": "Description claire et concise de l'erreur, en tenant compte du contexte"
+    }}
+  ],
+  "correction": "Texte corrigé exactement identique au texte dicté, sans fautes",
+  "total_words": <nombre total de mots dans le texte original>,
+  "error_count": <nombre total d'erreurs réelles détectées>
+}}
+
+IMPORTANT : AUCUN texte supplémentaire. UNIQUEMENT le JSON. PAS d'explication ou commentaire autour.
+"""
         
         # Génération de la correction avec Gemini
         response = model.generate_content(prompt)
