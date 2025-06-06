@@ -282,13 +282,21 @@ def correct_dictation_view(request):
     logger.info("Début de la correction de la dictée")
     if request.method == 'POST':
         try:
+            logger.info(f"Corps de la requête : {request.body}")
             data = json.loads(request.body)
+            logger.info(f"Données parsées : {data}")
             user_text = data.get('user_text', '').strip()
             dictation_id = data.get('dictation_id', 14)
             logger.info(f"Texte reçu : {user_text}")
+            logger.info(f"ID de la dictée : {dictation_id}")
             
             # Récupérer la dictée
-            dictation = Dictation.objects.get(id=dictation_id)
+            try:
+                dictation = Dictation.objects.get(id=dictation_id)
+                logger.info(f"Dictée trouvée : {dictation.title}")
+            except Dictation.DoesNotExist:
+                logger.error(f"Dictée non trouvée avec l'ID {dictation_id}")
+                return JsonResponse({'error': 'Dictée non trouvée'}, status=404)
             
             # Créer une tentative
             attempt = DictationAttempt.objects.create(
@@ -296,6 +304,7 @@ def correct_dictation_view(request):
                 user_text=user_text,
                 is_completed=True
             )
+            logger.info(f"Tentative créée avec l'ID {attempt.id}")
             
             # Utiliser Gemini pour évaluer la dictée
             prompt = f"""Tu es un professeur de français qui corrige une dictée. 
@@ -341,14 +350,18 @@ def correct_dictation_view(request):
             
             IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
             
+            logger.info("Envoi de la requête à Gemini")
             response = model.generate_content(prompt)
+            logger.info(f"Réponse de Gemini : {response.text}")
             correction_data = json.loads(response.text)
+            logger.info(f"Données de correction : {correction_data}")
             
             # Mettre à jour la tentative
             attempt.score = correction_data['score']
             attempt.feedback = correction_data['feedback']
             attempt.mistakes = correction_data['errors']
             attempt.save()
+            logger.info("Tentative mise à jour avec les résultats")
             
             return JsonResponse({
                 **correction_data,
@@ -357,6 +370,7 @@ def correct_dictation_view(request):
             
         except Exception as e:
             logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")
+            logger.exception("Trace complète de l'erreur :")
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
 
