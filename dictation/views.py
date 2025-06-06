@@ -1,13 +1,22 @@
 from django.shortcuts import render
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.conf import settings
 import google.generativeai as genai
 from gtts import gTTS
 import os
-from .models import Dictation, DictationAttempt
-from .serializers import DictationSerializer, DictationAttemptSerializer
+from django.contrib.auth import get_user_model
+from .models import (
+    UserProfile, Dictation, DictationAttempt,
+    UserProgress, UserAchievement, UserFeedback
+)
+from .serializers import (
+    UserSerializer, UserProfileSerializer, DictationSerializer,
+    DictationAttemptSerializer, UserProgressSerializer,
+    UserAchievementSerializer, UserFeedbackSerializer,
+    RegisterSerializer, LoginSerializer
+)
 from rest_framework.views import APIView
 from .services import generate_dictation, correct_dictation
 import logging
@@ -18,6 +27,10 @@ from django.views.decorators.http import require_http_methods
 import json
 from datetime import datetime
 import difflib
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
+
+User = get_user_model()
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
@@ -27,8 +40,75 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-1.0-pro')
 
 class DictationViewSet(viewsets.ModelViewSet):
-    queryset = Dictation.objects.all().order_by('-created_at')
+    queryset = Dictation.objects.all()
     serializer_class = DictationSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = Dictation.objects.filter(is_public=True)
+        if self.request.user.is_authenticated:
+            queryset |= Dictation.objects.filter(created_by=self.request.user)
+        return queryset.distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def attempt(self, request, pk=None):
+        dictation = self.get_object()
+        serializer = DictationAttemptSerializer(data=request.data)
+        if serializer.is_valid():
+            attempt = serializer.save(
+                dictation=dictation,
+                user=request.user
+            )
+            # Mise à jour du profil utilisateur
+            profile = request.user.profile
+            profile.total_attempts += 1
+            if attempt.score:
+                profile.total_score += attempt.score
+            profile.save()
+            
+            # Mise à jour de la progression
+            progress, created = UserProgress.objects.get_or_create(
+                user=request.user,
+                dictation=dictation
+            )
+            progress.attempts_count += 1
+            if attempt.score and attempt.score > progress.best_score:
+                progress.best_score = attempt.score
+            progress.last_attempt = attempt.created_at
+            progress.save()
+            
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class UserProfileViewSet(viewsets.ModelViewSet):
+    serializer_class = UserProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return UserProfile.objects.filter(user=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def progress(self, request):
+        progress = UserProgress.objects.filter(user=request.user)
+        return Response(UserProgressSerializer(progress, many=True).data)
+
+    @action(detail=False, methods=['get'])
+    def achievements(self, request):
+        achievements = UserAchievement.objects.filter(user=request.user)
+        return Response(UserAchievementSerializer(achievements, many=True).data)
+
+class UserFeedbackViewSet(viewsets.ModelViewSet):
+    serializer_class = UserFeedbackSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return UserFeedback.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
     @action(detail=True, methods=['post'])
     def generate_audio(self, request, pk=None):
@@ -197,3 +277,18 @@ def correct_dictation_view(request):
             logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")
             return JsonResponse({'error': str(e)}, status=400)
     return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+
+class RegisterView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'user': UserSerializer(user).data,
+                'access': str(refresh.access_token),
+                'refresh': str(refresh)
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

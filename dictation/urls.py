@@ -1,12 +1,23 @@
-from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
-from . import views
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
+from .views import (
+    DictationViewSet,
+    UserProfileViewSet, UserFeedbackViewSet,
+    RegisterView
+)
+
+router = DefaultRouter()
+router.register(r'dictations', DictationViewSet, basename='dictation')
+router.register(r'profile', UserProfileViewSet, basename='profile')
+router.register(r'feedback', UserFeedbackViewSet, basename='feedback')
 
 urlpatterns = [
-    path('dictation/generate/', views.generate_dictation_view, name='generate_dictation'),
-    path('dictation/correct/', views.correct_dictation_view, name='correct_dictation'),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    path('', include(router.urls)),
+    path('auth/register/', RegisterView.as_view(), name='register'),
+    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+]
 
 # Pour le débogage
 print("URLs de l'app dictation:")

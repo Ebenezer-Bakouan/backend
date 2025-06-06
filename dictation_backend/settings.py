@@ -206,4 +206,7 @@ LOGGING = {
 }
 
 # Gemini API settings
-GEMINI_API_KEY = 'AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI' 
+GEMINI_API_KEY = 'AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI'
+
+# User model
+AUTH_USER_MODEL = 'auth.User' 
