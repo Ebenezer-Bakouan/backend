@@ -316,6 +316,16 @@ def correct_dictation_view(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Convertir l'ID en nombre
+        try:
+            dictation_id = int(dictation_id)
+        except (ValueError, TypeError):
+            logger.error(f"ID de dictée invalide: {dictation_id}")
+            return Response(
+                {'error': 'ID de dictée invalide'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         # Récupérer la dictée
         try:
             dictation = Dictation.objects.get(id=dictation_id)
