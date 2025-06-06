@@ -4,7 +4,8 @@ from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
 from .views import (
     DictationViewSet,
     UserProfileViewSet, UserFeedbackViewSet,
-    RegisterView, UserInfoView
+    RegisterView, UserInfoView,
+    correct_dictation_view
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ urlpatterns = [
     path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('auth/user-info/', UserInfoView.as_view(), name='user-info'),
+    path('dictation/correct/', correct_dictation_view, name='correct-dictation'),
 ]
 
 # Pour le débogage
