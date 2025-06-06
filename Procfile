@@ -1,1 +1,1 @@
-web: gunicorn dictation_backend.wsgi:application 
+web: gunicorn dictation_backend.wsgi:application --bind 0.0.0.0:$PORT 
