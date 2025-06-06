@@ -158,8 +158,17 @@ def generate_dictation(params):
         audio_path = os.path.join(dictations_dir, f'dictation_{timestamp}.mp3')
         audio_url = generate_audio_from_text(result['text'], audio_path)
         
+        # Créer une nouvelle dictée dans la base de données
+        from .models import Dictation
+        dictation = Dictation.objects.create(
+            title=result['title'],
+            text=result['text'],
+            difficulty=result['difficulty'],
+            audio_file=f'dictations/dictation_{timestamp}.mp3'
+        )
+        
         return {
-            'id': 14,  # ID temporaire
+            'id': dictation.id,  # Utiliser l'ID réel de la base de données
             'text': result['text'],
             'audio_url': audio_url,
             'title': result['title'],
