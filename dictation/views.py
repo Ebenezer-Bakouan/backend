@@ -357,10 +357,22 @@ def correct_dictation_view(request):
                 IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
                 
                 logger.info("Envoi de la requête à Gemini")
-                response = model.generate_content(prompt)
+                response = model.generate_content(prompt, generation_config={
+                    'temperature': 0.1,
+                    'top_p': 0.8,
+                    'top_k': 40,
+                    'max_output_tokens': 2048,
+                })
                 logger.info(f"Réponse de Gemini : {response.text}")
-                correction_data = json.loads(response.text)
-                logger.info(f"Données de correction : {correction_data}")
+                
+                try:
+                    correction_data = json.loads(response.text)
+                    logger.info(f"Données de correction : {correction_data}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Erreur lors du parsing de la réponse JSON : {str(e)}")
+                    logger.error(f"Réponse reçue : {response.text}")
+                    return JsonResponse({'error': 'Erreur lors du traitement de la réponse'}, status=500)
+                
             except Exception as e:
                 logger.error(f"Erreur lors de l'évaluation par Gemini : {str(e)}")
                 return JsonResponse({'error': 'Erreur lors de l\'évaluation de la dictée'}, status=500)
