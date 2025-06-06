@@ -319,21 +319,22 @@ def correct_dictation_view(request):
         # Convertir l'ID en nombre
         try:
             dictation_id = int(dictation_id)
-        except (ValueError, TypeError):
-            logger.error(f"ID de dictée invalide: {dictation_id}")
+            logger.info(f"ID de dictée converti en nombre: {dictation_id}")
+        except (ValueError, TypeError) as e:
+            logger.error(f"Erreur de conversion de l'ID de dictée: {str(e)}")
             return Response(
-                {'error': 'ID de dictée invalide'},
+                {'error': f'ID de dictée invalide: {dictation_id}'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         # Récupérer la dictée
         try:
             dictation = Dictation.objects.get(id=dictation_id)
-            logger.info(f"Dictée trouvée: {dictation.title}")
+            logger.info(f"Dictée trouvée: {dictation.title} (ID: {dictation.id})")
         except Dictation.DoesNotExist:
             logger.error(f"Dictée non trouvée avec l'ID {dictation_id}")
             return Response(
-                {'error': 'Dictée non trouvée'},
+                {'error': f'Dictée non trouvée avec l\'ID {dictation_id}'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
