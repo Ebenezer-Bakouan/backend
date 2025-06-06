@@ -36,8 +36,14 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 # Configuration de l'API Gemini
-genai.configure(api_key=settings.GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.0-pro')
+logger.info("Configuration de l'API Gemini")
+try:
+    genai.configure(api_key=settings.GEMINI_API_KEY)
+    model = genai.GenerativeModel('gemini-1.0-pro')
+    logger.info("API Gemini configurée avec succès")
+except Exception as e:
+    logger.error(f"Erreur lors de la configuration de l'API Gemini : {str(e)}")
+    logger.exception("Trace complète de l'erreur de configuration Gemini :")
 
 class DictationViewSet(viewsets.ModelViewSet):
     queryset = Dictation.objects.all()
@@ -365,13 +371,18 @@ def correct_dictation_view(request):
                 
                 logger.info("Envoi de la requête à Gemini")
                 logger.info(f"Configuration de Gemini : {settings.GEMINI_API_KEY[:5]}...")
-                response = model.generate_content(prompt, generation_config={
-                    'temperature': 0.1,
-                    'top_p': 0.8,
-                    'top_k': 40,
-                    'max_output_tokens': 2048,
-                })
-                logger.info(f"Réponse de Gemini : {response.text}")
+                try:
+                    response = model.generate_content(prompt, generation_config={
+                        'temperature': 0.1,
+                        'top_p': 0.8,
+                        'top_k': 40,
+                        'max_output_tokens': 2048,
+                    })
+                    logger.info(f"Réponse de Gemini : {response.text}")
+                except Exception as e:
+                    logger.error(f"Erreur lors de l'appel à Gemini : {str(e)}")
+                    logger.exception("Trace complète de l'erreur Gemini :")
+                    return JsonResponse({'error': 'Erreur lors de l\'appel à l\'API Gemini'}, status=500)
                 
                 try:
                     correction_data = json.loads(response.text)
