@@ -294,74 +294,87 @@ def correct_dictation_view(request):
             try:
                 dictation = Dictation.objects.get(id=dictation_id)
                 logger.info(f"Dictée trouvée : {dictation.title}")
+                logger.info(f"Texte original : {dictation.text}")
             except Dictation.DoesNotExist:
                 logger.error(f"Dictée non trouvée avec l'ID {dictation_id}")
                 return JsonResponse({'error': 'Dictée non trouvée'}, status=404)
             
             # Créer une tentative
-            attempt = DictationAttempt.objects.create(
-                dictation=dictation,
-                user_text=user_text,
-                is_completed=True
-            )
-            logger.info(f"Tentative créée avec l'ID {attempt.id}")
+            try:
+                attempt = DictationAttempt.objects.create(
+                    dictation=dictation,
+                    user_text=user_text,
+                    is_completed=True
+                )
+                logger.info(f"Tentative créée avec l'ID {attempt.id}")
+            except Exception as e:
+                logger.error(f"Erreur lors de la création de la tentative : {str(e)}")
+                return JsonResponse({'error': 'Erreur lors de la création de la tentative'}, status=500)
             
             # Utiliser Gemini pour évaluer la dictée
-            prompt = f"""Tu es un professeur de français qui corrige une dictée. 
-            Voici le texte original de la dictée (EXACTEMENT comme il a été lu dans l'audio) :
-            
-            {dictation.text}
-            
-            Et voici le texte écrit par l'élève :
-            
-            {user_text}
-            
-            Ta tâche est de :
-            1. Comparer le texte avec la dictée originale MOT POUR MOT
-            2. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
-            3. Attribuer une note sur 100 en fonction de la qualité du texte
-            4. Fournir une liste détaillée des erreurs
-            5. Fournir le texte corrigé EXACTEMENT comme dans l'audio
-            
-            Règles de notation :
-            - Pour chaque mot manquant : -5 points
-            - Pour chaque erreur d'orthographe : -2 points
-            - Pour chaque erreur de grammaire : -3 points
-            - Pour chaque erreur de ponctuation : -1 point
-            
-            IMPORTANT : Le texte corrigé doit être EXACTEMENT le même que le texte original, sans aucune modification.
-            
-            Réponds au format JSON suivant :
-            {{
-                "score": <note sur 100>,
-                "errors": [
-                    {{
-                        "type": "orthographe|grammaire|ponctuation|mot_manquant",
-                        "word": "mot concerné",
-                        "description": "Description détaillée de l'erreur"
-                    }},
-                    ...
-                ],
-                "correction": "Texte complet corrigé (EXACTEMENT comme dans l'audio)",
-                "total_words": <nombre total de mots dans le texte original>,
-                "error_count": <nombre total d'erreurs>,
-                "feedback": "Commentaire général sur la performance"
-            }}
-            
-            IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
-            
-            logger.info("Envoi de la requête à Gemini")
-            response = model.generate_content(prompt)
-            logger.info(f"Réponse de Gemini : {response.text}")
-            correction_data = json.loads(response.text)
-            logger.info(f"Données de correction : {correction_data}")
+            try:
+                prompt = f"""Tu es un professeur de français qui corrige une dictée. 
+                Voici le texte original de la dictée (EXACTEMENT comme il a été lu dans l'audio) :
+                
+                {dictation.text}
+                
+                Et voici le texte écrit par l'élève :
+                
+                {user_text}
+                
+                Ta tâche est de :
+                1. Comparer le texte avec la dictée originale MOT POUR MOT
+                2. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
+                3. Attribuer une note sur 100 en fonction de la qualité du texte
+                4. Fournir une liste détaillée des erreurs
+                5. Fournir le texte corrigé EXACTEMENT comme dans l'audio
+                
+                Règles de notation :
+                - Pour chaque mot manquant : -5 points
+                - Pour chaque erreur d'orthographe : -2 points
+                - Pour chaque erreur de grammaire : -3 points
+                - Pour chaque erreur de ponctuation : -1 point
+                
+                IMPORTANT : Le texte corrigé doit être EXACTEMENT le même que le texte original, sans aucune modification.
+                
+                Réponds au format JSON suivant :
+                {{
+                    "score": <note sur 100>,
+                    "errors": [
+                        {{
+                            "type": "orthographe|grammaire|ponctuation|mot_manquant",
+                            "word": "mot concerné",
+                            "description": "Description détaillée de l'erreur"
+                        }},
+                        ...
+                    ],
+                    "correction": "Texte complet corrigé (EXACTEMENT comme dans l'audio)",
+                    "total_words": <nombre total de mots dans le texte original>,
+                    "error_count": <nombre total d'erreurs>,
+                    "feedback": "Commentaire général sur la performance"
+                }}
+                
+                IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
+                
+                logger.info("Envoi de la requête à Gemini")
+                response = model.generate_content(prompt)
+                logger.info(f"Réponse de Gemini : {response.text}")
+                correction_data = json.loads(response.text)
+                logger.info(f"Données de correction : {correction_data}")
+            except Exception as e:
+                logger.error(f"Erreur lors de l'évaluation par Gemini : {str(e)}")
+                return JsonResponse({'error': 'Erreur lors de l\'évaluation de la dictée'}, status=500)
             
             # Mettre à jour la tentative
-            attempt.score = correction_data['score']
-            attempt.feedback = correction_data['feedback']
-            attempt.mistakes = correction_data['errors']
-            attempt.save()
-            logger.info("Tentative mise à jour avec les résultats")
+            try:
+                attempt.score = correction_data['score']
+                attempt.feedback = correction_data['feedback']
+                attempt.mistakes = correction_data['errors']
+                attempt.save()
+                logger.info("Tentative mise à jour avec les résultats")
+            except Exception as e:
+                logger.error(f"Erreur lors de la mise à jour de la tentative : {str(e)}")
+                return JsonResponse({'error': 'Erreur lors de la mise à jour des résultats'}, status=500)
             
             return JsonResponse({
                 **correction_data,
