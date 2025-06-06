@@ -245,6 +245,26 @@ class DictationViewSet(viewsets.ViewSet):
                 status=500
             )
 
+    def create(self, request):
+        try:
+            # Génération de la dictée avec les paramètres du body
+            result = generate_dictation(request.data)
+            
+            if 'error' in result:
+                return Response(
+                    {"error": result['error']},
+                    status=400
+                )
+            
+            return Response(result, status=201)
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de la génération de la dictée : {str(e)}")
+            return Response(
+                {"error": "Une erreur est survenue lors de la génération de la dictée"},
+                status=500
+            )
+
 @csrf_exempt
 def generate_dictation_view(request):
     if request.method == 'POST':
