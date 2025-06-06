@@ -131,6 +131,8 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "https://frontend-three-zeta-75.vercel.app",
+    "https://frontend-git-main-ebenezer-bakouans-projects.vercel.app",
+    "https://frontend-7xobgaguj-ebenezer-bakouans-projects.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
@@ -152,6 +154,8 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+CORS_ORIGIN_ALLOW_ALL = True  # Temporairement pour le développement
+CORS_ALLOW_ALL_ORIGINS = True  # Temporairement pour le développement
 
 # Celery settings
 CELERY_BROKER_URL = env('REDIS_URL', default='redis://localhost:6379/0')
