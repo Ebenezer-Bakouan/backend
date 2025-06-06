@@ -206,7 +206,7 @@ LOGGING = {
 }
 
 # Gemini API settings
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
 
 # User model
 AUTH_USER_MODEL = 'auth.User' 

@@ -371,6 +371,11 @@ def correct_dictation_view(request):
                 
                 logger.info("Envoi de la requête à Gemini")
                 logger.info(f"Configuration de Gemini : {settings.GEMINI_API_KEY[:5]}...")
+                
+                if not settings.GEMINI_API_KEY:
+                    logger.error("Clé API Gemini non configurée")
+                    return JsonResponse({'error': 'Configuration API manquante'}, status=500)
+                
                 try:
                     response = model.generate_content(prompt, generation_config={
                         'temperature': 0.1,
@@ -422,10 +427,13 @@ def correct_dictation_view(request):
                 'attempt_id': attempt.id
             })
             
+        except json.JSONDecodeError as e:
+            logger.error(f"Erreur lors du parsing du JSON de la requête : {str(e)}")
+            return JsonResponse({'error': 'Format de requête invalide'}, status=400)
         except Exception as e:
             logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")
             logger.exception("Trace complète de l'erreur :")
-            return JsonResponse({'error': str(e)}, status=400)
+            return JsonResponse({'error': 'Erreur interne du serveur'}, status=500)
     return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
 
 class RegisterView(APIView):
