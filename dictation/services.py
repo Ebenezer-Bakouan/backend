@@ -288,13 +288,18 @@ Ta mission est de :
    - Erreur de ponctuation : -1 point
    - Mauvaise construction ou confusion sémantique : -3 points
    ⚠️ Si une erreur entraîne d'autres en chaîne, ne retire des points qu'une seule fois (pas de pénalité cumulative injuste).
-5. Reconstitue le texte **corrigé**, exactement comme dans la dictée originale.
+5. Reconstitue le texte **corrigé**, exactement comme dans la dictée originale, mais SANS les répétitions de phrases.
 6. Garde une **approche pédagogique**, pas robotique.
 
 Pour chaque erreur, fournis une description claire et pédagogique qui explique :
 - Le type d'erreur (orthographe, grammaire, accord, ponctuation, mot manquant)
 - La règle concernée
 - Un conseil pour éviter cette erreur à l'avenir
+
+À la fin, ajoute une section "Conseils pédagogiques" qui :
+1. Résume les types d'erreurs les plus fréquents
+2. Donne des conseils pratiques pour améliorer ces points
+3. Propose des exercices simples pour s'entraîner
 
 Réponds uniquement avec un JSON strictement valide, au format suivant :
 {{
@@ -306,9 +311,14 @@ Réponds uniquement avec un JSON strictement valide, au format suivant :
       "description": "Description claire et pédagogique de l'erreur, incluant le type d'erreur, la règle et un conseil"
     }}
   ],
-  "correction": "Texte corrigé exactement identique au texte dicté, sans fautes",
+  "correction": "Texte corrigé exactement identique au texte dicté, mais sans les répétitions de phrases",
   "total_words": <nombre total de mots dans le texte original>,
-  "error_count": <nombre total d'erreurs réelles détectées>
+  "error_count": <nombre total d'erreurs réelles détectées>,
+  "pedagogical_advice": {{
+    "summary": "Résumé des erreurs les plus fréquentes",
+    "tips": ["Liste de conseils pratiques"],
+    "exercises": ["Liste d'exercices simples pour s'entraîner"]
+  }}
 }}
 
 IMPORTANT : 
