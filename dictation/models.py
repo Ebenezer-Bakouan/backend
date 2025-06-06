@@ -97,3 +97,18 @@ class UserFeedback(models.Model):
 
     def __str__(self):
         return f"{self.user.username}'s feedback on {self.dictation.title}"
+
+class DictationCorrection(models.Model):
+    dictation = models.ForeignKey(Dictation, on_delete=models.CASCADE, related_name='corrections')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dictation_corrections')
+    user_text = models.TextField()
+    original_text = models.TextField()
+    score = models.FloatField(default=0)
+    error_count = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Correction de {self.user.username} pour {self.dictation.title}"

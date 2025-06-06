@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.conf import settings
 import google.generativeai as genai
@@ -9,7 +9,7 @@ import os
 from django.contrib.auth import get_user_model
 from .models import (
     UserProfile, Dictation, DictationAttempt,
-    UserProgress, UserAchievement, UserFeedback
+    UserProgress, UserAchievement, UserFeedback, DictationCorrection
 )
 from .serializers import (
     UserSerializer, UserProfileSerializer, DictationSerializer,
@@ -29,6 +29,7 @@ from datetime import datetime
 import difflib
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from itertools import zip_longest
 
 User = get_user_model()
 
@@ -283,161 +284,93 @@ def generate_dictation_view(request):
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
 
-@csrf_exempt
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
 def correct_dictation_view(request):
-    logger.info("Début de la correction de la dictée")
-    logger.info(f"Méthode de la requête : {request.method}")
-    logger.info(f"Headers de la requête : {request.headers}")
-    logger.info(f"Corps de la requête brut : {request.body}")
-    
-    if request.method == 'POST':
+    """
+    Corrige une dictée soumise par l'utilisateur.
+    """
+    try:
+        # Récupérer les données de la requête
+        dictation_id = request.data.get('dictation_id')
+        user_text = request.data.get('user_text', '').strip()
+        
+        # Validation des données
+        if not dictation_id:
+            return Response(
+                {'error': 'ID de dictée manquant'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        if not user_text:
+            return Response(
+                {'error': 'Le texte de la dictée est vide'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Récupérer la dictée
         try:
-            data = json.loads(request.body)
-            logger.info(f"Données parsées : {data}")
-            user_text = data.get('user_text', '').strip()
-            dictation_id = data.get('dictation_id', 14)
-            logger.info(f"Texte reçu : {user_text}")
-            logger.info(f"ID de la dictée : {dictation_id}")
-            
-            if not user_text:
-                logger.error("Le texte de l'utilisateur est vide")
-                return JsonResponse({'error': 'Le texte de l\'utilisateur est vide'}, status=400)
-            
-            # Récupérer la dictée
-            try:
-                dictation = Dictation.objects.get(id=dictation_id)
-                logger.info(f"Dictée trouvée : {dictation.title}")
-                logger.info(f"Texte original : {dictation.text}")
-            except Dictation.DoesNotExist:
-                logger.error(f"Dictée non trouvée avec l'ID {dictation_id}")
-                return JsonResponse({'error': 'Dictée non trouvée'}, status=404)
-            except Exception as e:
-                logger.error(f"Erreur lors de la récupération de la dictée : {str(e)}")
-                return JsonResponse({'error': 'Erreur lors de la récupération de la dictée'}, status=500)
-            
-            # Créer une tentative
-            try:
-                attempt = DictationAttempt.objects.create(
-                    dictation=dictation,
-                    user_text=user_text,
-                    is_completed=True
-                )
-                logger.info(f"Tentative créée avec l'ID {attempt.id}")
-            except Exception as e:
-                logger.error(f"Erreur lors de la création de la tentative : {str(e)}")
-                return JsonResponse({'error': 'Erreur lors de la création de la tentative'}, status=500)
-            
-            # Utiliser Gemini pour évaluer la dictée
-            try:
-                prompt = f"""Tu es un professeur de français qui corrige une dictée. 
-                Voici le texte original de la dictée (EXACTEMENT comme il a été lu dans l'audio) :
-                
-                {dictation.text}
-                
-                Et voici le texte écrit par l'élève :
-                
-                {user_text}
-                
-                Ta tâche est de :
-                1. Comparer le texte avec la dictée originale MOT POUR MOT
-                2. Identifier toutes les erreurs (orthographe, grammaire, ponctuation)
-                3. Attribuer une note sur 100 en fonction de la qualité du texte
-                4. Fournir une liste détaillée des erreurs
-                5. Fournir le texte corrigé EXACTEMENT comme dans l'audio
-                
-                Règles de notation :
-                - Pour chaque mot manquant : -5 points
-                - Pour chaque erreur d'orthographe : -2 points
-                - Pour chaque erreur de grammaire : -3 points
-                - Pour chaque erreur de ponctuation : -1 point
-                
-                IMPORTANT : Le texte corrigé doit être EXACTEMENT le même que le texte original, sans aucune modification.
-                
-                Réponds au format JSON suivant :
-                {{
-                    "score": <note sur 100>,
-                    "errors": [
-                        {{
-                            "type": "orthographe|grammaire|ponctuation|mot_manquant",
-                            "word": "mot concerné",
-                            "description": "Description détaillée de l'erreur"
-                        }},
-                        ...
-                    ],
-                    "correction": "Texte complet corrigé (EXACTEMENT comme dans l'audio)",
-                    "total_words": <nombre total de mots dans le texte original>,
-                    "error_count": <nombre total d'erreurs>,
-                    "feedback": "Commentaire général sur la performance"
-                }}
-                
-                IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
-                
-                logger.info("Envoi de la requête à Gemini")
-                logger.info(f"Configuration de Gemini : {settings.GEMINI_API_KEY[:5]}...")
-                
-                if not settings.GEMINI_API_KEY:
-                    logger.error("Clé API Gemini non configurée")
-                    return JsonResponse({'error': 'Configuration API manquante'}, status=500)
-                
-                try:
-                    response = model.generate_content(prompt, generation_config={
-                        'temperature': 0.1,
-                        'top_p': 0.8,
-                        'top_k': 40,
-                        'max_output_tokens': 2048,
-                    })
-                    logger.info(f"Réponse de Gemini : {response.text}")
-                except Exception as e:
-                    logger.error(f"Erreur lors de l'appel à Gemini : {str(e)}")
-                    logger.exception("Trace complète de l'erreur Gemini :")
-                    return JsonResponse({'error': 'Erreur lors de l\'appel à l\'API Gemini'}, status=500)
-                
-                try:
-                    correction_data = json.loads(response.text)
-                    logger.info(f"Données de correction : {correction_data}")
-                    
-                    # Vérifier que toutes les clés requises sont présentes
-                    required_keys = ['score', 'errors', 'correction', 'total_words', 'error_count', 'feedback']
-                    missing_keys = [key for key in required_keys if key not in correction_data]
-                    if missing_keys:
-                        logger.error(f"Clés manquantes dans la réponse : {missing_keys}")
-                        return JsonResponse({'error': 'Réponse incomplète de l\'évaluateur'}, status=500)
-                        
-                except json.JSONDecodeError as e:
-                    logger.error(f"Erreur lors du parsing de la réponse JSON : {str(e)}")
-                    logger.error(f"Réponse reçue : {response.text}")
-                    return JsonResponse({'error': 'Erreur lors du traitement de la réponse'}, status=500)
-                
-            except Exception as e:
-                logger.error(f"Erreur lors de l'évaluation par Gemini : {str(e)}")
-                logger.exception("Trace complète de l'erreur Gemini :")
-                return JsonResponse({'error': 'Erreur lors de l\'évaluation de la dictée'}, status=500)
-            
-            # Mettre à jour la tentative
-            try:
-                attempt.score = correction_data['score']
-                attempt.feedback = correction_data['feedback']
-                attempt.mistakes = correction_data['errors']
-                attempt.save()
-                logger.info("Tentative mise à jour avec les résultats")
-            except Exception as e:
-                logger.error(f"Erreur lors de la mise à jour de la tentative : {str(e)}")
-                logger.exception("Trace complète de l'erreur de mise à jour :")
-                return JsonResponse({'error': 'Erreur lors de la mise à jour des résultats'}, status=500)
-            
-            return JsonResponse({
-                **correction_data,
-                'attempt_id': attempt.id
-            })
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Erreur lors du parsing du JSON de la requête : {str(e)}")
-            return JsonResponse({'error': 'Format de requête invalide'}, status=400)
-        except Exception as e:
-            logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")
-            logger.exception("Trace complète de l'erreur :")
-            return JsonResponse({'error': 'Erreur interne du serveur'}, status=500)
-    return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
+            dictation = Dictation.objects.get(id=dictation_id)
+        except Dictation.DoesNotExist:
+            return Response(
+                {'error': 'Dictée non trouvée'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Récupérer le texte original
+        original_text = dictation.text.strip()
+        
+        # Créer une nouvelle correction
+        correction = DictationCorrection.objects.create(
+            dictation=dictation,
+            user=request.user,
+            user_text=user_text,
+            original_text=original_text
+        )
+
+        # Calculer les erreurs
+        errors = []
+        user_words = user_text.lower().split()
+        original_words = original_text.lower().split()
+        
+        # Comparer les mots
+        for i, (user_word, original_word) in enumerate(zip_longest(user_words, original_words, fillvalue='')):
+            if user_word != original_word:
+                errors.append({
+                    'position': i + 1,
+                    'user_word': user_word,
+                    'correct_word': original_word
+                })
+
+        # Calculer le score
+        total_words = len(original_words)
+        error_count = len(errors)
+        score = max(0, 100 - (error_count / total_words * 100)) if total_words > 0 else 0
+
+        # Mettre à jour la correction
+        correction.score = score
+        correction.error_count = error_count
+        correction.save()
+
+        # Préparer la réponse
+        response_data = {
+            'correction_id': correction.id,
+            'score': score,
+            'error_count': error_count,
+            'total_words': total_words,
+            'errors': errors,
+            'original_text': original_text,
+            'user_text': user_text
+        }
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Erreur lors de la correction de la dictée: {str(e)}")
+        return Response(
+            {'error': 'Erreur lors de la correction de la dictée'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
