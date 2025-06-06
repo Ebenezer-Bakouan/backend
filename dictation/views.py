@@ -290,6 +290,10 @@ def correct_dictation_view(request):
             logger.info(f"Texte reçu : {user_text}")
             logger.info(f"ID de la dictée : {dictation_id}")
             
+            if not user_text:
+                logger.error("Le texte de l'utilisateur est vide")
+                return JsonResponse({'error': 'Le texte de l\'utilisateur est vide'}, status=400)
+            
             # Récupérer la dictée
             try:
                 dictation = Dictation.objects.get(id=dictation_id)
@@ -298,6 +302,9 @@ def correct_dictation_view(request):
             except Dictation.DoesNotExist:
                 logger.error(f"Dictée non trouvée avec l'ID {dictation_id}")
                 return JsonResponse({'error': 'Dictée non trouvée'}, status=404)
+            except Exception as e:
+                logger.error(f"Erreur lors de la récupération de la dictée : {str(e)}")
+                return JsonResponse({'error': 'Erreur lors de la récupération de la dictée'}, status=500)
             
             # Créer une tentative
             try:
@@ -357,6 +364,7 @@ def correct_dictation_view(request):
                 IMPORTANT : Ne fournis QUE le JSON, sans commentaires ni explications supplémentaires."""
                 
                 logger.info("Envoi de la requête à Gemini")
+                logger.info(f"Configuration de Gemini : {settings.GEMINI_API_KEY[:5]}...")
                 response = model.generate_content(prompt, generation_config={
                     'temperature': 0.1,
                     'top_p': 0.8,
@@ -368,6 +376,14 @@ def correct_dictation_view(request):
                 try:
                     correction_data = json.loads(response.text)
                     logger.info(f"Données de correction : {correction_data}")
+                    
+                    # Vérifier que toutes les clés requises sont présentes
+                    required_keys = ['score', 'errors', 'correction', 'total_words', 'error_count', 'feedback']
+                    missing_keys = [key for key in required_keys if key not in correction_data]
+                    if missing_keys:
+                        logger.error(f"Clés manquantes dans la réponse : {missing_keys}")
+                        return JsonResponse({'error': 'Réponse incomplète de l\'évaluateur'}, status=500)
+                        
                 except json.JSONDecodeError as e:
                     logger.error(f"Erreur lors du parsing de la réponse JSON : {str(e)}")
                     logger.error(f"Réponse reçue : {response.text}")
@@ -375,6 +391,7 @@ def correct_dictation_view(request):
                 
             except Exception as e:
                 logger.error(f"Erreur lors de l'évaluation par Gemini : {str(e)}")
+                logger.exception("Trace complète de l'erreur Gemini :")
                 return JsonResponse({'error': 'Erreur lors de l\'évaluation de la dictée'}, status=500)
             
             # Mettre à jour la tentative
@@ -386,6 +403,7 @@ def correct_dictation_view(request):
                 logger.info("Tentative mise à jour avec les résultats")
             except Exception as e:
                 logger.error(f"Erreur lors de la mise à jour de la tentative : {str(e)}")
+                logger.exception("Trace complète de l'erreur de mise à jour :")
                 return JsonResponse({'error': 'Erreur lors de la mise à jour des résultats'}, status=500)
             
             return JsonResponse({
