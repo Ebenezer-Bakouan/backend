@@ -293,6 +293,7 @@ def correct_dictation_view(request):
     try:
         logger.info(f"Requête de correction reçue de l'utilisateur: {request.user.username}")
         logger.info(f"Headers de la requête: {request.headers}")
+        logger.info(f"Données de la requête: {request.data}")
         
         # Récupérer les données de la requête
         dictation_id = request.data.get('dictation_id')
@@ -325,43 +326,64 @@ def correct_dictation_view(request):
                 {'error': 'Dictée non trouvée'},
                 status=status.HTTP_404_NOT_FOUND
             )
+        except Exception as e:
+            logger.error(f"Erreur lors de la récupération de la dictée: {str(e)}")
+            return Response(
+                {'error': f'Erreur lors de la récupération de la dictée: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         # Récupérer le texte original
         original_text = dictation.text.strip()
+        logger.info(f"Texte original: {original_text[:50]}...")
         
-        # Créer une nouvelle correction
-        correction = DictationCorrection.objects.create(
-            dictation=dictation,
-            user=request.user,
-            user_text=user_text,
-            original_text=original_text
-        )
-        logger.info(f"Correction créée avec l'ID {correction.id}")
+        try:
+            # Créer une nouvelle correction
+            correction = DictationCorrection.objects.create(
+                dictation=dictation,
+                user=request.user,
+                user_text=user_text,
+                original_text=original_text
+            )
+            logger.info(f"Correction créée avec l'ID {correction.id}")
+        except Exception as e:
+            logger.error(f"Erreur lors de la création de la correction: {str(e)}")
+            return Response(
+                {'error': f'Erreur lors de la création de la correction: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-        # Calculer les erreurs
-        errors = []
-        user_words = user_text.lower().split()
-        original_words = original_text.lower().split()
-        
-        # Comparer les mots
-        for i, (user_word, original_word) in enumerate(zip_longest(user_words, original_words, fillvalue='')):
-            if user_word != original_word:
-                errors.append({
-                    'position': i + 1,
-                    'user_word': user_word,
-                    'correct_word': original_word
-                })
+        try:
+            # Calculer les erreurs
+            errors = []
+            user_words = user_text.lower().split()
+            original_words = original_text.lower().split()
+            
+            # Comparer les mots
+            for i, (user_word, original_word) in enumerate(zip_longest(user_words, original_words, fillvalue='')):
+                if user_word != original_word:
+                    errors.append({
+                        'position': i + 1,
+                        'user_word': user_word,
+                        'correct_word': original_word
+                    })
 
-        # Calculer le score
-        total_words = len(original_words)
-        error_count = len(errors)
-        score = max(0, 100 - (error_count / total_words * 100)) if total_words > 0 else 0
+            # Calculer le score
+            total_words = len(original_words)
+            error_count = len(errors)
+            score = max(0, 100 - (error_count / total_words * 100)) if total_words > 0 else 0
 
-        # Mettre à jour la correction
-        correction.score = score
-        correction.error_count = error_count
-        correction.save()
-        logger.info(f"Correction mise à jour - score: {score}, erreurs: {error_count}")
+            # Mettre à jour la correction
+            correction.score = score
+            correction.error_count = error_count
+            correction.save()
+            logger.info(f"Correction mise à jour - score: {score}, erreurs: {error_count}")
+        except Exception as e:
+            logger.error(f"Erreur lors du calcul des erreurs: {str(e)}")
+            return Response(
+                {'error': f'Erreur lors du calcul des erreurs: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         # Préparer la réponse
         response_data = {
@@ -380,7 +402,7 @@ def correct_dictation_view(request):
         logger.error(f"Erreur lors de la correction de la dictée: {str(e)}")
         logger.exception("Trace complète de l'erreur:")
         return Response(
-            {'error': 'Erreur lors de la correction de la dictée'},
+            {'error': f'Erreur lors de la correction de la dictée: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
