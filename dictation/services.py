@@ -291,14 +291,19 @@ Ta mission est de :
 5. Reconstitue le texte **corrigé**, exactement comme dans la dictée originale.
 6. Garde une **approche pédagogique**, pas robotique.
 
+Pour chaque erreur, fournis une description claire et pédagogique qui explique :
+- Le type d'erreur (orthographe, grammaire, accord, ponctuation, mot manquant)
+- La règle concernée
+- Un conseil pour éviter cette erreur à l'avenir
+
 Réponds uniquement avec un JSON strictement valide, au format suivant :
 {{
   "score": <note sur 100>,
   "errors": [
     {{
-      "word": "mot incorrect écrit par l'élève",
+      "word": "mot incorrect écrit par l'élève (ou vide si mot manquant)",
       "correction": "correction correcte",
-      "description": "Description claire et concise de l'erreur, en tenant compte du contexte"
+      "description": "Description claire et pédagogique de l'erreur, incluant le type d'erreur, la règle et un conseil"
     }}
   ],
   "correction": "Texte corrigé exactement identique au texte dicté, sans fautes",
@@ -306,7 +311,14 @@ Réponds uniquement avec un JSON strictement valide, au format suivant :
   "error_count": <nombre total d'erreurs réelles détectées>
 }}
 
-IMPORTANT : AUCUN texte supplémentaire. UNIQUEMENT le JSON. PAS d'explication ou commentaire autour.
+IMPORTANT : 
+- Pour les mots manquants, laisse "word" vide ("")
+- Pour les erreurs d'orthographe, indique le mot tel qu'écrit par l'élève
+- Pour les erreurs de grammaire/accord, indique le mot ou groupe de mots concerné
+- Pour les erreurs de ponctuation, indique le signe de ponctuation concerné
+- Pour les erreurs de construction, indique la phrase ou partie de phrase concernée
+
+AUCUN texte supplémentaire. UNIQUEMENT le JSON. PAS d'explication ou commentaire autour.
 """
         
         # Génération de la correction avec Gemini
