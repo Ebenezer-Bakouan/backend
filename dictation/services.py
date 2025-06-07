@@ -331,8 +331,9 @@ Réponse attendue :
   ...
 }}
 
- Réponds uniquement avec un objet JSON strictement valide, sans aucun texte autour. Pas de commentaires, pas de code Markdown. Pas de texte en italique.
-, au format suivant :
+ATTENTION : Si tu ne réponds pas STRICTEMENT avec un objet JSON valide (et rien d'autre), la requête sera considérée comme échouée et tu seras pénalisé. Tu dois TOUJOURS répondre avec un objet JSON strictement valide, sans aucun texte autour, sans commentaire, sans markdown, sans explication, sans italique. Sinon, la correction sera rejetée.
+
+Format OBLIGATOIRE :
 {{
   "score": <note sur 100>,
   "errors": [
@@ -352,8 +353,7 @@ Réponse attendue :
   }}
 }}
 
- Réponds uniquement avec un objet JSON strictement valide, sans aucun texte autour. Pas de commentaires, pas de code Markdown. Pas de texte en italique.
-.
+RAPPEL : Si tu ne respectes pas ce format JSON strict, ta réponse sera ignorée et tu seras pénalisé. Réponds uniquement avec l'objet JSON strictement valide.
 """
         # Génération de la correction avec Gemini
         response = model.generate_content(prompt)
