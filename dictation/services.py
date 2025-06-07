@@ -271,20 +271,18 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         # Configuration de Gemini
         genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
         model = genai.GenerativeModel('gemini-1.5-flash')
-        # Prompt pour la correction
+        # Prompt pour la correction (utilise les textes nettoyés)
         prompt = f"""
 Tu es un professeur de français expérimenté qui corrige les dictées d'élèves en Afrique francophone (Burkina Faso en particulier). Tu fais une correction juste, logique et bienveillante.
 
-Voici le texte ORIGINAL de la dictée, exactement comme lu dans l'audio :
-
---- 
-{dictation.text}
+Voici le texte ORIGINAL de la dictée (nettoyé, sans casse ni espaces superflus) :
+---
+{cleaned_dictation_text}
 ---
 
-Et voici ce qu'a écrit l'élève :
-
+Et voici ce qu'a écrit l'élève (nettoyé, sans casse ni espaces superflus) :
 ---
-{user_text}
+{cleaned_user_text}
 ---
 
 Ta mission est de :
@@ -314,10 +312,10 @@ Ajoute une section "Conseils pédagogiques" avec :
 
 Exemple :
 Texte original :
-"Le chien court dans le jardin."
+"le chien court dans le jardin."
 
 Texte élève :
-"Le chie cour dan le jardin"
+"le chie cour dan le jardin"
 
 Réponse attendue :
 {{
