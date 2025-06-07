@@ -359,7 +359,11 @@ Réponse attendue :
 """
         # Génération de la correction avec Gemini
         response = model.generate_content(prompt)
-        correction_data = json.loads(response.text)
+        response_text = response.text.strip()
+        if not response_text or not response_text.startswith('{'):
+            logger.error(f"Réponse vide ou non JSON de Gemini : {response_text}")
+            raise ValueError("La réponse de Gemini n'est pas un JSON valide.")
+        correction_data = json.loads(response_text)
         # Sauvegarder la tentative dans la base de données
         attempt = DictationAttempt.objects.create(
             dictation=dictation,
