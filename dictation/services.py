@@ -270,7 +270,7 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
             }
         # Configuration de Gemini
         genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
-        model = genai.GenerativeModel('gemini-1.0-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         # Prompt pour la correction
         prompt = f"""
 Tu es un professeur de français expérimenté qui corrige les dictées d'élèves en Afrique francophone (Burkina Faso en particulier). Tu fais une correction juste, logique et bienveillante.
