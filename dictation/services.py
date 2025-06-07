@@ -279,57 +279,75 @@ Et voici ce qu'a écrit l'élève :
 
 Ta mission est de :
 1. Comparer le texte de l'élève au texte original, non pas mot à mot, mais en tenant compte du **sens global**, du **contexte**, de la **syntaxe** et de la **logique grammaticale**.
-2. Ne pénalise pas toute la suite du texte si l'élève a juste oublié ou ajouté un mot. Ne sois pas rigide : si l'élève a suivi le fil logique, conserve les points quand c'est justifié.
-3. Identifie uniquement les **vraies erreurs** (orthographe, conjugaison, accord, ponctuation, grammaire).
-4. Attribue une note sur 100 selon ce barème :
+2. Ne pénalise pas toute la suite du texte si l'élève a juste oublié ou ajouté un mot. Continue l'analyse avec un **alignement intelligent**.
+3. Ignore les répétitions exactes de phrases. Ne les considère pas comme des fautes si elles suivent le sens dicté.
+4. Accepte certaines tournures francophones locales tant qu'elles restent grammaticalement correctes et cohérentes.
+5. Identifie uniquement les **vraies erreurs** (orthographe, conjugaison, accord, ponctuation, grammaire).
+6. Attribue une note sur 100 selon ce barème :
    - Mot clairement manquant : -5 points
    - Erreur d'orthographe : -2 points
    - Erreur de grammaire ou d'accord : -3 points
    - Erreur de ponctuation : -1 point
    - Mauvaise construction ou confusion sémantique : -3 points
-   ⚠️ Si une erreur entraîne d'autres en chaîne, ne retire des points qu'une seule fois (pas de pénalité cumulative injuste).
-5. Reconstitue le texte **corrigé**, exactement comme dans la dictée originale, mais SANS les répétitions de phrases.
-6. Garde une **approche pédagogique**, pas robotique.
+    Ne cumule pas les fautes en cascade : une seule pénalité par erreur source.
+7. Reconstitue le texte **corrigé**, exactement comme dans la dictée originale, mais **sans les répétitions**.
 
-Pour chaque erreur, fournis une description claire et pédagogique qui explique :
+Pour chaque erreur, fournis une description claire et pédagogique :
 - Le type d'erreur (orthographe, grammaire, accord, ponctuation, mot manquant)
 - La règle concernée
-- Un conseil pour éviter cette erreur à l'avenir
+- Un conseil pour éviter cette erreur
 
-À la fin, ajoute une section "Conseils pédagogiques" qui :
-1. Résume les types d'erreurs les plus fréquents
-2. Donne des conseils pratiques pour améliorer ces points
-3. Propose des exercices simples pour s'entraîner
+Ajoute une section "Conseils pédagogiques" avec :
+1. Résumé des erreurs fréquentes
+2. Conseils pratiques pour s'améliorer
+3. Exercices simples à faire
 
-Réponds uniquement avec un JSON strictement valide, au format suivant :
+Exemple :
+Texte original :
+"Le chien court dans le jardin."
+
+Texte élève :
+"Le chie cour dan le jardin"
+
+Réponse attendue :
+{{
+  "score": 92,
+  "errors": [
+    {{
+      "word": "chie",
+      "correction": "chien",
+      "description": "Erreur d'orthographe : 'chie' est incorrect. Conseil : attention aux noms communs terminés en -ien."
+    }},
+    ...
+  ],
+  ...
+}}
+
+ Réponds uniquement avec un objet JSON strictement valide, sans aucun texte autour. Pas de commentaires, pas de code Markdown. Pas de texte en italique.
+, au format suivant :
 {{
   "score": <note sur 100>,
   "errors": [
     {{
-      "word": "mot incorrect écrit par l'élève (ou vide si mot manquant)",
-      "correction": "correction correcte",
-      "description": "Description claire et pédagogique de l'erreur, incluant le type d'erreur, la règle et un conseil"
+      "word": "...",
+      "correction": "...",
+      "description": "..."
     }}
   ],
-  "correction": "Texte corrigé exactement identique au texte dicté, mais sans les répétitions de phrases",
-  "total_words": <nombre total de mots dans le texte original>,
-  "error_count": <nombre total d'erreurs réelles détectées>,
+  "correction": "Texte corrigé sans fautes et sans répétitions",
+  "total_words": <nombre de mots dans le texte original>,
+  "error_count": <nombre d'erreurs réelles détectées>,
   "pedagogical_advice": {{
-    "summary": "Résumé des erreurs les plus fréquentes",
-    "tips": ["Liste de conseils pratiques"],
-    "exercises": ["Liste d'exercices simples pour s'entraîner"]
+    "summary": "...",
+    "tips": ["...", "..."],
+    "exercises": ["...", "..."]
   }}
 }}
 
-IMPORTANT : 
-- Pour les mots manquants, laisse "word" vide ("")
-- Pour les erreurs d'orthographe, indique le mot tel qu'écrit par l'élève
-- Pour les erreurs de grammaire/accord, indique le mot ou groupe de mots concerné
-- Pour les erreurs de ponctuation, indique le signe de ponctuation concerné
-- Pour les erreurs de construction, indique la phrase ou partie de phrase concernée
-
-AUCUN texte supplémentaire. UNIQUEMENT le JSON. PAS d'explication ou commentaire autour.
+ Réponds uniquement avec un objet JSON strictement valide, sans aucun texte autour. Pas de commentaires, pas de code Markdown. Pas de texte en italique.
+.
 """
+
         
         # Génération de la correction avec Gemini
         response = model.generate_content(prompt)
