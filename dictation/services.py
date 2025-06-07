@@ -184,6 +184,21 @@ Tu es un professeur de français spécialiste de l'enseignement en Afrique de l'
         logger.error(f"Erreur lors de la génération de la dictée : {str(e)}")
         return {"error": str(e)}
 
+def clean_text_for_comparison(text: str) -> str:
+    """
+    Nettoie le texte pour une comparaison plus juste :
+    - supprime les espaces en début/fin
+    - remplace les espaces multiples par un seul
+    - met en minuscules
+    - supprime les caractères invisibles
+    """
+    import re
+    text = text.strip()
+    text = re.sub(r'\s+', ' ', text)
+    text = text.lower()
+    text = text.replace('\u200b', '')  # caractères invisibles courants
+    return text
+
 def correct_dictation(user_text: str, dictation_id: int) -> dict:
     """
     Corrige la dictée de l'utilisateur en utilisant Gemini.
@@ -201,8 +216,12 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
         from .models import Dictation, DictationAttempt
         dictation = Dictation.objects.get(id=dictation_id)
         
+        # Nettoyage des textes pour éviter les faux négatifs
+        cleaned_user_text = clean_text_for_comparison(user_text)
+        cleaned_dictation_text = clean_text_for_comparison(dictation.text)
+        
         # Vérification STRICTE du texte vide
-        if not user_text or not user_text.strip():
+        if not cleaned_user_text:
             logger.warning("Texte vide détecté")
             result = {
                 'score': 0,
@@ -215,23 +234,19 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
                 'total_words': len(dictation.text.split()),
                 'error_count': len(dictation.text.split())
             }
-            
-            # Sauvegarder la tentative dans la base de données
             attempt = DictationAttempt.objects.create(
                 dictation=dictation,
                 user_text=user_text,
                 score=0,
                 feedback=json.dumps(result)
             )
-            
             return {
                 **result,
                 'attempt_id': attempt.id
             }
-        
         # Vérification de la longueur minimale
-        if len(user_text.strip()) < len(dictation.text) * 0.1:
-            logger.warning(f"Texte trop court : {len(user_text.strip())} < {len(dictation.text) * 0.1}")
+        if len(cleaned_user_text) < len(cleaned_dictation_text) * 0.1:
+            logger.warning(f"Texte trop court : {len(cleaned_user_text)} < {len(cleaned_dictation_text) * 0.1}")
             result = {
                 'score': 0,
                 'errors': [{
@@ -243,24 +258,19 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
                 'total_words': len(dictation.text.split()),
                 'error_count': len(dictation.text.split())
             }
-            
-            # Sauvegarder la tentative dans la base de données
             attempt = DictationAttempt.objects.create(
                 dictation=dictation,
                 user_text=user_text,
                 score=0,
                 feedback=json.dumps(result)
             )
-            
             return {
                 **result,
                 'attempt_id': attempt.id
             }
-        
         # Configuration de Gemini
         genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
         model = genai.GenerativeModel('gemini-1.0-pro')
-        
         # Prompt pour la correction
         prompt = f"""
 Tu es un professeur de français expérimenté qui corrige les dictées d'élèves en Afrique francophone (Burkina Faso en particulier). Tu fais une correction juste, logique et bienveillante.
@@ -347,12 +357,9 @@ Réponse attendue :
  Réponds uniquement avec un objet JSON strictement valide, sans aucun texte autour. Pas de commentaires, pas de code Markdown. Pas de texte en italique.
 .
 """
-
-        
         # Génération de la correction avec Gemini
         response = model.generate_content(prompt)
         correction_data = json.loads(response.text)
-        
         # Sauvegarder la tentative dans la base de données
         attempt = DictationAttempt.objects.create(
             dictation=dictation,
@@ -360,12 +367,10 @@ Réponse attendue :
             score=correction_data['score'],
             feedback=json.dumps(correction_data)
         )
-        
         return {
             **correction_data,
             'attempt_id': attempt.id
         }
-        
     except Exception as e:
         logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")
-        raise 
+        raise
