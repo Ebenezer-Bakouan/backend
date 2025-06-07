@@ -288,134 +288,40 @@ def generate_dictation_view(request):
 @permission_classes([permissions.IsAuthenticated])
 def correct_dictation_view(request):
     """
-    Corrige une dictée soumise par l'utilisateur.
+    Corrige une dictée soumise par l'utilisateur de façon pédagogique (alignement intelligent, feedback détaillé).
     """
     try:
         logger.info(f"Requête de correction reçue de l'utilisateur: {request.user.username}")
         logger.info(f"Headers de la requête: {request.headers}")
         logger.info(f"Données de la requête: {request.data}")
         
-        # Récupérer les données de la requête
         dictation_id = request.data.get('dictation_id')
         user_text = request.data.get('user_text', '').strip()
         
         logger.info(f"Données reçues - dictation_id: {dictation_id}, user_text: {user_text[:50]}...")
         
-        # Validation des données
         if not dictation_id:
             logger.error("ID de dictée manquant")
-            return Response(
-                {'error': 'ID de dictée manquant'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-            
+            return Response({'error': 'ID de dictée manquant'}, status=status.HTTP_400_BAD_REQUEST)
         if not user_text:
             logger.error("Texte de la dictée vide")
-            return Response(
-                {'error': 'Le texte de la dictée est vide'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Convertir l'ID en nombre
+            return Response({'error': 'Le texte de la dictée est vide'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             dictation_id = int(dictation_id)
-            logger.info(f"ID de dictée converti en nombre: {dictation_id}")
         except (ValueError, TypeError) as e:
             logger.error(f"Erreur de conversion de l'ID de dictée: {str(e)}")
-            return Response(
-                {'error': f'ID de dictée invalide: {dictation_id}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Récupérer la dictée
+            return Response({'error': f'ID de dictée invalide: {dictation_id}'}, status=status.HTTP_400_BAD_REQUEST)
+        # Correction pédagogique via le service
         try:
-            dictation = Dictation.objects.get(id=dictation_id)
-            logger.info(f"Dictée trouvée: {dictation.title} (ID: {dictation.id})")
-        except Dictation.DoesNotExist:
-            logger.error(f"Dictée non trouvée avec l'ID {dictation_id}")
-            return Response(
-                {'error': f'Dictée non trouvée avec l\'ID {dictation_id}'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            result = correct_dictation(user_text, dictation_id)
+            return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
-            logger.error(f"Erreur lors de la récupération de la dictée: {str(e)}")
-            return Response(
-                {'error': f'Erreur lors de la récupération de la dictée: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-        # Récupérer le texte original
-        original_text = dictation.text.strip()
-        logger.info(f"Texte original: {original_text[:50]}...")
-        
-        try:
-            # Créer une nouvelle correction
-            correction = DictationCorrection.objects.create(
-                dictation=dictation,
-                user=request.user,
-                user_text=user_text,
-                original_text=original_text
-            )
-            logger.info(f"Correction créée avec l'ID {correction.id}")
-        except Exception as e:
-            logger.error(f"Erreur lors de la création de la correction: {str(e)}")
-            return Response(
-                {'error': f'Erreur lors de la création de la correction: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-        try:
-            # Calculer les erreurs
-            errors = []
-            user_words = user_text.lower().split()
-            original_words = original_text.lower().split()
-            
-            # Comparer les mots
-            for i, (user_word, original_word) in enumerate(zip_longest(user_words, original_words, fillvalue='')):
-                if user_word != original_word:
-                    errors.append({
-                        'position': i + 1,
-                        'user_word': user_word,
-                        'correct_word': original_word
-                    })
-
-            # Calculer le score
-            total_words = len(original_words)
-            error_count = len(errors)
-            score = max(0, 100 - (error_count / total_words * 100)) if total_words > 0 else 0
-
-            # Mettre à jour la correction
-            correction.score = score
-            correction.error_count = error_count
-            correction.save()
-            logger.info(f"Correction mise à jour - score: {score}, erreurs: {error_count}")
-        except Exception as e:
-            logger.error(f"Erreur lors du calcul des erreurs: {str(e)}")
-            return Response(
-                {'error': f'Erreur lors du calcul des erreurs: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-        # Préparer la réponse
-        response_data = {
-            'correction_id': correction.id,
-            'score': score,
-            'error_count': error_count,
-            'total_words': total_words,
-            'errors': errors,
-            'original_text': original_text,
-            'user_text': user_text
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)
-
+            logger.error(f"Erreur lors de la correction pédagogique: {str(e)}")
+            return Response({'error': f'Erreur lors de la correction: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     except Exception as e:
         logger.error(f"Erreur lors de la correction de la dictée: {str(e)}")
         logger.exception("Trace complète de l'erreur:")
-        return Response(
-            {'error': f'Erreur lors de la correction de la dictée: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        return Response({'error': f'Erreur lors de la correction de la dictée: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
