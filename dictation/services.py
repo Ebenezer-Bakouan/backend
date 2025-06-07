@@ -358,6 +358,16 @@ RAPPEL : Si tu ne respectes pas ce format JSON strict, ta réponse sera ignorée
         # Génération de la correction avec Gemini
         response = model.generate_content(prompt)
         response_text = response.text.strip()
+        # Correction : extraire le JSON même s'il est entouré de texte ou de balises
+        if '```json' in response_text:
+            response_text = response_text.split('```json',1)[-1]
+        if '```' in response_text:
+            response_text = response_text.split('```',1)[0]
+        response_text = response_text.strip()
+        if not response_text.startswith('{'):
+            response_text = response_text[response_text.find('{'):] if '{' in response_text else response_text
+        if not response_text.endswith('}'): 
+            response_text = response_text[:response_text.rfind('}')+1] if '}' in response_text else response_text
         if not response_text or not response_text.startswith('{'):
             logger.error(f"Réponse vide ou non JSON de Gemini : {response_text}")
             raise ValueError("La réponse de Gemini n'est pas un JSON valide.")
