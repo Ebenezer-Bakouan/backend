@@ -79,67 +79,81 @@ def generate_dictation(params):
         dict: Dictionnaire contenant le texte de la dictée et le chemin du fichier audio
     """
     try:
-        # Configuration de l'API Gemini
         configure_gemini_api()
-        
-        # Extraction des paramètres
+        # Extraction des nouveaux paramètres
         age = params.get('age', '12')
         niveau_scolaire = params.get('niveauScolaire', 'Étudiant')
         objectif = params.get('objectifApprentissage', 'orthographe')
         difficultes = params.get('difficultesSpecifiques', '')
         temps = params.get('tempsDisponible', '10')
-        
-        # Construction du prompt pour Gemini
-        prompt = f"""
-Tu es un professeur de français spécialiste de l'enseignement en Afrique de l'Ouest, notamment au Burkina Faso. Tu conçois des dictées vivantes et instructives pour des élèves burkinabè. Réponds UNIQUEMENT avec un OBJET JSON VALIDE. Ne donne aucun autre texte.
+        niveau = params.get('niveau', 'facile')
+        sujet = params.get('sujet', '')
+        longueur = params.get('longueurTexte', '')
+        type_contenu = params.get('typeContenu', '')
+        vitesse = params.get('vitesseLecture', '')
+        inclure_grammaire = params.get('includeGrammaire', False)
+        inclure_conjugaison = params.get('includeConjugaison', False)
+        inclure_orthographe = params.get('includeOrthographe', False)
 
-### Informations sur l'élève
+        # Nouveau prompt enrichi
+        prompt = f"""
+Tu es un professeur de français expert, spécialisé dans la création de dictées pédagogiques culturelles pour des élèves burkinabè. Tu dois générer une dictée adaptée à un profil d’élève donné, sous forme d’un objet JSON enrichi, sans aucun retour à la ligne, balise ou symbole de formatage. Le texte doit être 100 % lisible et naturel.
+
+## Profil de l'élève
 - Âge : {age} ans
 - Niveau scolaire : {niveau_scolaire}
 - Objectif d'apprentissage : {objectif}
-- Difficultés spécifiques à travailler : {difficultes}
-- Durée estimée : {temps} minutes
+- Difficultés spécifiques : {difficultes or 'aucune'}
+- Temps disponible : {temps} minutes
 
-### Objectif de la dictée
+## Paramètres de la dictée
+- Sujet imposé : {sujet or 'la vie au village'}
+- Longueur souhaitée : {longueur or 'moyenne'}
+- Niveau de difficulté : {niveau or 'moyen'}
+- Type de contenu : {type_contenu or 'narratif'}
+- Vitesse de lecture : {vitesse or 'normale'}
+- Inclure orthographe complexe : {'oui' if inclure_orthographe else 'non'}
+- Inclure conjugaisons difficiles : {'oui' if inclure_conjugaison else 'non'}
+- Inclure accords grammaticaux : {'oui' if inclure_grammaire else 'non'}
 
-1. **Créer un petit récit cohérent, captivant et authentique**, inspiré d'un contexte africain (de préférence burkinabè).
-2. Le récit doit se dérouler dans un **village, une ville ou une région du Burkina Faso**, ou faire référence à une **coutume locale, un animal de la savane, un métier traditionnel, une fête ou une scène de la vie quotidienne**.
-3. Le texte doit intégrer un **savoir culturel ou lexical** : découverte d'un animal (ex : le fennec, le pangolin), d'un métier (ex : potier, forgeron), d'un lieu (ex : Bobo-Dioulasso, Gorom-Gorom), ou d'une pratique (ex : marché, cuisine, danse, masques, contes…).
-4. Ajouter **au moins 3 mots peu fréquents ou spécifiques à la culture locale ou à la nature**, mais compréhensibles par le contexte.
-5. Style fluide, phrases simples et syntaxe correcte, adaptées au niveau indiqué.
-6. Répétition pédagogique :
-   - Phrases **longues** (>10 mots) → **répétées 3 fois**
-   - Phrases **courtes** (≤10 mots) → **répétées 2 fois**
-   - Les répétitions doivent **sembler naturelles**, comme dans un conte ou un rappel narratif.
-7. Ne surtout pas utiliser de formatage, retour à la ligne ou texte explicatif ne mest apas des asteristque ni les texte en gras.
-### Format OBLIGATOIRE de sortie
+## Contraintes de création
+1. Respecte strictement le sujet imposé : \"{sujet or 'la vie au village'}\".
+2. La longueur réelle du texte doit correspondre à :
+   - Court : 3 à 4 phrases
+   - Moyenne : 6 à 8 phrases
+   - Long : 10 à 12 phrases ou plus
+3. Chaque phrase de plus de 10 mots doit être répétée 3 fois, les plus courtes, 2 fois, naturellement.
+4. Utilise un vocabulaire soutenu, culturellement situé (Burkina Faso), et évite toute simplification abusive.
+5. Intègre au moins 3 mots rares, peu utilisés ou typiques du terroir burkinabè. Pas de glossaire.
+6. Si demandé, inclure des conjugaisons complexes (imparfait, passé simple, conditionnel, etc.) et des accords grammaticaux exigeants.
+7. Ne retourne AUCUN astérisque, tiret, retour à la ligne, ni balise HTML ou Markdown.
+8. Retourne un objet JSON enrichi selon le format ci-dessous.
+
+## Format de réponse JSON obligatoire
 {{
-  "text": "Texte intégral de la dictée avec répétitions intégrées dans un style fluide.",
-  "title": "Titre court, en lien avec le thème culturel ou naturel burkinabè",
-  "difficulty": "facile" // ou "moyenne" ou "difficile", selon le contenu généré
+  "title": "Un titre original et évocateur du thème choisi",
+  "text": "Texte intégral de la dictée avec répétitions naturelles intégrées",
+  "difficulty": "{niveau or 'moyen'}",
+  "longueur_reelle": "{longueur or 'moyenne'}",
+  "vocabulaire_rare": ["mot1", "mot2", "mot3"],
+  "score_difficulte": un score entre 1 et 10 basé sur la richesse lexicale, syntaxique et les pièges orthographiques,
+  "types_conjugaisons": ["passé simple", "imparfait", "futur"]  // si includeConjugaison,
+  "accords_complexes": ["accord sujet-verbe inversé", "participe passé avec avoir"]  // si includeGrammaire
 }}
 """
-        
-        # Génération de la dictée avec Gemini
         model = genai.GenerativeModel('gemini-2.0-flash')
         response = model.generate_content(prompt)
-        
-        # Validation et parsing de la réponse JSON
         try:
-            # Nettoyage de la réponse pour s'assurer qu'elle est un JSON valide
             response_text = response.text.strip()
             if not response_text.startswith('{'):
                 response_text = response_text[response_text.find('{'):]
             if not response_text.endswith('}'):
                 response_text = response_text[:response_text.rfind('}')+1]
-            
             result = json.loads(response_text)
-            
-            # Validation des champs requis
-            required_fields = ['text', 'title', 'difficulty']
+            # Validation des champs requis (au moins ceux du format enrichi)
+            required_fields = ['text', 'title', 'difficulty', 'longueur_reelle', 'vocabulaire_rare', 'score_difficulte']
             if not all(field in result for field in required_fields):
-                raise ValueError("Réponse JSON incomplète")
-                
+                raise ValueError("Réponse JSON enrichie incomplète")
         except json.JSONDecodeError as e:
             logger.error(f"Erreur de parsing JSON : {str(e)}")
             logger.error(f"Réponse brute de Gemini : {response.text}")
@@ -147,22 +161,14 @@ Tu es un professeur de français spécialiste de l'enseignement en Afrique de l'
         except Exception as e:
             logger.error(f"Erreur lors du traitement de la réponse : {str(e)}")
             return {"error": str(e)}
-        
-        # Création du dossier pour les dictées s'il n'existe pas
         dictations_dir = os.path.join(settings.MEDIA_ROOT, 'dictations')
         os.makedirs(dictations_dir, exist_ok=True)
-        
-        # Sauvegarde du texte dans un fichier JSON
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         json_path = os.path.join(dictations_dir, f'dictation_{timestamp}.json')
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(result, f, ensure_ascii=False, indent=2)
-        
-        # Génération de l'audio avec le chemin complet
         audio_path = os.path.join(dictations_dir, f'dictation_{timestamp}.mp3')
         audio_url = generate_audio_from_text(result['text'], audio_path)
-        
-        # Créer une nouvelle dictée dans la base de données
         from .models import Dictation
         dictation = Dictation.objects.create(
             title=result['title'],
@@ -170,15 +176,19 @@ Tu es un professeur de français spécialiste de l'enseignement en Afrique de l'
             difficulty=result['difficulty'],
             audio_file=f'dictations/dictation_{timestamp}.mp3'
         )
-        
+        # Structure enrichie en retour
         return {
-            'id': dictation.id,  # Utiliser l'ID réel de la base de données
+            'id': dictation.id,
             'text': result['text'],
             'audio_url': audio_url,
             'title': result['title'],
-            'difficulty': result['difficulty']
+            'difficulty': result['difficulty'],
+            'longueur_reelle': result.get('longueur_reelle'),
+            'vocabulaire_rare': result.get('vocabulaire_rare'),
+            'score_difficulte': result.get('score_difficulte'),
+            'types_conjugaisons': result.get('types_conjugaisons'),
+            'accords_complexes': result.get('accords_complexes'),
         }
-        
     except Exception as e:
         logger.error(f"Erreur lors de la génération de la dictée : {str(e)}")
         return {"error": str(e)}
@@ -371,6 +381,15 @@ RAPPEL : Si tu ne respectes pas ce format JSON strict, ta réponse sera ignorée
             logger.error(f"Réponse vide ou non JSON de Gemini : {response_text}")
             raise ValueError("La réponse de Gemini n'est pas un JSON valide.")
         correction_data = json.loads(response_text)
+        # Correction : forcer la présence des champs attendus pour le front
+        correction_data['correction'] = correction_data.get('correction', '') or ''
+        correction_data['errors'] = [
+            {
+                'word': err.get('word', '') or '',
+                'correction': err.get('correction', '') or '',
+                'description': err.get('description', '') or ''
+            } for err in correction_data.get('errors', [])
+        ]
         # Sauvegarder la tentative dans la base de données
         attempt = DictationAttempt.objects.create(
             dictation=dictation,
