@@ -111,8 +111,7 @@ Tu es un professeur de français spécialiste de l'enseignement en Afrique de l'
    - Phrases **longues** (>10 mots) → **répétées 3 fois**
    - Phrases **courtes** (≤10 mots) → **répétées 2 fois**
    - Les répétitions doivent **sembler naturelles**, comme dans un conte ou un rappel narratif.
-7. Ne surtout pas utiliser de formatage, retour à la ligne ou texte explicatif.
-
+7. Ne surtout pas utiliser de formatage, retour à la ligne ou texte explicatif ne mest apas des asteristque ni les texte en gras.
 ### Format OBLIGATOIRE de sortie
 {{
   "text": "Texte intégral de la dictée avec répétitions intégrées dans un style fluide.",
