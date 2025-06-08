@@ -133,9 +133,9 @@ CORS_ALLOWED_ORIGINS = [
     "https://frontend-three-zeta-75.vercel.app",
     "https://frontend-git-main-ebenezer-bakouans-projects.vercel.app",
     "https://frontend-7xobgaguj-ebenezer-bakouans-projects.vercel.app",
-    "dictebf.vercel.app",
-    "dictebf-git-main-ebenezer-bakouans-projects.vercel.app",
-    "dicte-24rel1fxr-ebenezer-bakouans-projects.vercel.app",
+    "https://dictebf.vercel.app",
+    "https://dictebf-git-main-ebenezer-bakouans-projects.vercel.app",
+    "https://dicte-24rel1fxr-ebenezer-bakouans-projects.vercel.app",
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
@@ -212,4 +212,4 @@ LOGGING = {
 GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
 
 # User model
-AUTH_USER_MODEL = 'auth.User' 
+AUTH_USER_MODEL = 'auth.User'
