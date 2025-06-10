@@ -206,27 +206,31 @@ def correct_text_with_ai(text):
 @api_view(['POST'])
 def process_image_gemini(request):
     try:
+        # Configuration de l'API Gemini
+        api_key = settings.GEMINI_API_KEY
+        if not api_key:
+            logger.error("Clé API Gemini non configurée")
+            return Response({'error': "Configuration de l'API manquante"}, status=500)
+        genai.configure(api_key=api_key)
+        
         # Get base64 image from request
         image_data = request.data.get('image')
         dictation_id = request.data.get('dictation_id')
         
         if not image_data:
-            return Response({'error': 'No image data provided'}, status=400)
+            return Response({'error': 'Aucune image fournie'}, status=400)
 
         # Remove data URL prefix if present
         if 'base64,' in image_data:
             image_data = image_data.split('base64,')[1]
 
         # Convert base64 to bytes
-        image_bytes = base64.b64decode(image_data)
-        
-        # Get the original dictation text for context
         try:
-            dictation = Dictation.objects.get(id=dictation_id)
-            original_text = dictation.text
-        except Dictation.DoesNotExist:
-            return Response({'error': 'Dictation not found'}, status=404)
-
+            image_bytes = base64.b64decode(image_data)
+        except Exception as e:
+            logger.error(f"Erreur lors du décodage de l'image : {str(e)}")
+            return Response({'error': "Format d'image invalide"}, status=400)
+        
         # Create Gemini image input
         image_parts = [
             {
@@ -235,43 +239,34 @@ def process_image_gemini(request):
             }
         ]
 
-        # Prompt for Gemini
-        prompt = f"""
-        Tu es un expert en correction de dictées françaises.
-        Je te montre une image d'un texte manuscrit qui est censé être la dictée suivante :
-        "{original_text}"
+        # Configurer le modèle Gemini
+        model = genai.GenerativeModel('gemini-pro-vision')
         
-        1. Extrait exactement le texte manuscrit de l'image
-        2. Compare-le avec le texte original
-        3. Fournis une correction détaillée avec les erreurs trouvées
-        
-        Format de réponse souhaité:
-        {{
-            "texte_extrait": "le texte exact de l'image",
-            "correction": {{
-                "erreurs": [
-                    {{"mot": "mot_erroné", "correction": "mot_correct", "description": "explication"}}
-                ],
-                "score": "score sur 100",
-                "feedback": "feedback général"
-            }}
-        }}
+        # Prompt pour l'extraction de texte
+        prompt = """
+        Tu es un expert en reconnaissance de texte manuscrit en français.
+        Examine l'image fournie et extrait exactement le texte que tu y vois.
+        Retourne uniquement le texte extrait, sans commentaires ni formatage.
         """
 
-        # Generate response from Gemini
-        response = model.generate_content(prompt, image_parts)
-        
         try:
-            # Parse the response to get structured data
-            result = json.loads(response.text)
-            return Response(result)
-        except json.JSONDecodeError:
-            # Fallback to return raw text if JSON parsing fails
+            # Generate response from Gemini
+            response = model.generate_content(prompt, image_parts)
+            text = response.text.strip()
+            
+            # Retourner le résultat
             return Response({
-                "texte_extrait": response.text,
-                "correction": None
+                "texte_extrait": text
             })
+            
+        except Exception as e:
+            logger.error(f"Erreur lors de l'analyse de l'image avec Gemini : {str(e)}")
+            return Response({
+                'error': "Erreur lors de l'analyse de l'image. Veuillez réessayer."
+            }, status=500)
 
     except Exception as e:
-        logger.error(f"Error processing image with Gemini: {str(e)}")
-        return Response({'error': str(e)}, status=500)
+        logger.error(f"Erreur lors du traitement de l'image : {str(e)}")
+        return Response({
+            'error': "Une erreur inattendue s'est produite. Veuillez réessayer."
+        }, status=500)
