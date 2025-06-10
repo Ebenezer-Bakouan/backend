@@ -280,9 +280,15 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
                 **result,
                 'attempt_id': attempt.id
             }
-        # Configuration de Gemini
-        genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Configuration de Gemini avec la clé depuis les paramètres
+        api_key = settings.GEMINI_API_KEY
+        if not api_key:
+            raise ValueError("La clé API Gemini n'est pas configurée")
+        genai.configure(api_key=api_key)
+        
+        # Utilisation du modèle Gemini adapté
+        model = genai.GenerativeModel('gemini-pro')
+
         # Prompt pour la correction (utilise les textes nettoyés)
         prompt = f"""
 Tu es un professeur de français expérimenté qui corrige les dictées d'élèves en Afrique francophone (Burkina Faso en particulier). Tu fais une correction juste, logique et bienveillante.
@@ -394,13 +400,7 @@ RAPPEL : Si tu ne respectes pas ce format JSON strict, ta réponse sera ignorée
             } for err in correction_data.get('errors', [])
         ]
         # Sauvegarder la tentative dans la base de données
-        attempt = DictationAttempt.objects.create(
-            dictation=dictation,
-            user_text=user_text,
-            score=correction_data['score'],
-            feedback=json.dumps(correction_data)
-        )
-        return {
+        attempt = Dict
             **correction_data,
             'attempt_id': attempt.id
         }
