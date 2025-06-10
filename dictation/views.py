@@ -1,23 +1,19 @@
 from django.shortcuts import render
-from rest_framework import viewsets, status, permissions
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework import viewsets, status
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django.conf import settings
 import google.generativeai as genai
 from gtts import gTTS
 import os
-from django.contrib.auth import get_user_model
 from .models import (
-    UserProfile, Dictation, DictationAttempt,
-    UserProgress, UserAchievement, UserFeedback, DictationCorrection
+    Dictation, DictationAttempt, UserFeedback, DictationCorrection
 )
 from .serializers import (
-    UserSerializer, UserProfileSerializer, DictationSerializer,
-    DictationAttemptSerializer, UserProgressSerializer,
-    UserAchievementSerializer, UserFeedbackSerializer,
-    RegisterSerializer, LoginSerializer
+    DictationSerializer,
+    DictationAttemptSerializer,
+    UserFeedbackSerializer
 )
-from rest_framework.views import APIView
 from .services import generate_dictation, correct_dictation
 import logging
 import urllib.parse
@@ -27,8 +23,6 @@ from django.views.decorators.http import require_http_methods
 import json
 from datetime import datetime
 import difflib
-from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
 from itertools import zip_longest
 import base64
 import io
@@ -54,16 +48,12 @@ except Exception as e:
 class DictationViewSet(viewsets.ModelViewSet):
     queryset = Dictation.objects.all()
     serializer_class = DictationSerializer
-    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        queryset = Dictation.objects.filter(is_public=True)
-        if self.request.user.is_authenticated:
-            queryset |= Dictation.objects.filter(created_by=self.request.user)
-        return queryset.distinct()
+        return Dictation.objects.filter(is_public=True)
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def attempt(self, request, pk=None):
