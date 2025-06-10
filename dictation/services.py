@@ -22,7 +22,10 @@ cloudinary.config(
 def configure_gemini_api():
     """Configure l'API Gemini avec la clé API."""
     try:
-        genai.configure(api_key='AIzaSyDyCb6Lp9S-sOlMUMVrhwAHfeAiG6poQGI')
+        api_key = settings.GEMINI_API_KEY
+        if not api_key:
+            raise ValueError("La clé API Gemini n'est pas configurée")
+        genai.configure(api_key=api_key)
         logger.info("Configuration de l'API Gemini réussie")
     except Exception as e:
         logger.error(f"Erreur lors de la configuration de l'API Gemini : {str(e)}")
