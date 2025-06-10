@@ -6,7 +6,8 @@ from .views import (
     UserProfileViewSet, UserFeedbackViewSet,
     RegisterView, UserInfoView,
     correct_dictation_view,
-    generate_dictation_view
+    generate_dictation_view,
+    process_image
 )
 
 router = DefaultRouter()
@@ -22,9 +23,10 @@ urlpatterns = [
     path('auth/user-info/', UserInfoView.as_view(), name='user-info'),
     path('dictation/correct/', correct_dictation_view, name='correct-dictation'),
     path('dictation/generate/', generate_dictation_view, name='generate-dictation'),
+    path('process-image/', process_image, name='process-image'),
 ]
 
 # Pour le débogage
 print("URLs de l'app dictation:")
 for url in urlpatterns:
-    print(f"- {url.pattern}") 
+    print(f"- {url.pattern}")

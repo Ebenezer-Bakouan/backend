@@ -30,6 +30,11 @@ import difflib
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from itertools import zip_longest
+import base64
+import io
+from PIL import Image
+import pytesseract
+import openai
 
 User = get_user_model()
 
@@ -353,6 +358,46 @@ class UserInfoView(APIView):
             'is_superuser': user.is_superuser
         })
 
-# Force deploy on Render
-# Last updated: 10 juin 2025
-# This file contains the API views for the dictation app
+@api_view(['POST'])
+def process_image(request):
+    try:
+        # Get base64 image from request
+        image_data = request.data.get('image')
+        if not image_data:
+            return Response({'error': 'No image data provided'}, status=400)
+
+        # Remove data URL prefix if present
+        if 'base64,' in image_data:
+            image_data = image_data.split('base64,')[1]
+
+        # Convert base64 to image
+        image_bytes = base64.b64decode(image_data)
+        image = Image.open(io.BytesIO(image_bytes))
+
+        # Extract text from image using Tesseract OCR
+        extracted_text = pytesseract.image_to_string(image, lang='fra')
+
+        # Use OpenAI to correct the text
+        corrected_text = correct_text_with_ai(extracted_text)
+
+        return Response({
+            'text': corrected_text,
+            'original_text': extracted_text
+        })
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+def correct_text_with_ai(text):
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Tu es un assistant spécialisé dans la correction de textes en français. Corrige les erreurs d'orthographe et de grammaire dans le texte suivant tout en conservant son sens original."},
+                {"role": "user", "content": text}
+            ]
+        )
+        return response.choices[0].message['content'].strip()
+    except Exception as e:
+        print(f"Error correcting text with AI: {str(e)}")
+        return text  # Return original text if AI correction fails

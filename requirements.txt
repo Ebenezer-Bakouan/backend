@@ -16,4 +16,4 @@ django-environ>=0.11.0
 django-cloudinary-storage>=0.3.0
 drf-yasg>=1.21.7
 Pillow>=10.2.0 
- 
+ pytesseract\nPillow\nopenai
