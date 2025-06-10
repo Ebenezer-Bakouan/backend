@@ -400,10 +400,15 @@ RAPPEL : Si tu ne respectes pas ce format JSON strict, ta réponse sera ignorée
             } for err in correction_data.get('errors', [])
         ]
         # Sauvegarder la tentative dans la base de données
-        attempt = Dict
-            **correction_data,
-            'attempt_id': attempt.id
-        }
+        attempt = DictationAttempt.objects.create(
+            dictation=dictation,
+            user_text=user_text,
+            score=correction_data.get('score', 0),
+            feedback=json.dumps(correction_data)
+        )
+        # Sauvegarder la tentative dans la base de données
+        correction_data['attempt_id'] = attempt.id
+        return correction_data
     except Exception as e:
         logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")
         raise
