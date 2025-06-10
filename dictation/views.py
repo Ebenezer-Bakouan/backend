@@ -352,3 +352,7 @@ class UserInfoView(APIView):
             'is_staff': user.is_staff,
             'is_superuser': user.is_superuser
         })
+
+# Force deploy on Render
+# Last updated: 10 juin 2025
+# This file contains the API views for the dictation app
