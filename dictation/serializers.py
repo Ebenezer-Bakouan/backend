@@ -46,10 +46,22 @@ class LoginSerializer(serializers.Serializer):
     password = serializers.CharField(required=True, write_only=True)
 
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name']
-        read_only_fields = ['id']
+        fields = ('id', 'username', 'email', 'password', 'first_name', 'last_name')
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data.get('email', ''),
+            password=validated_data['password'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', '')
+        )
+        return user
 
 class UserProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -108,5 +120,6 @@ class UserFeedbackSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = UserFeedback
-        fields = ['id', 'user', 'dictation', 'rating', 'comment', 'created_at']
-        read_only_fields = ['id', 'user', 'dictation', 'created_at'] 
+        fields = ['id', 'user', 'dictation', 'rating', 'comment', 'created_at'
+        ]
+        read_only_fields = ['id', 'user', 'dictation', 'created_at']
