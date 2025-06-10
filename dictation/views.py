@@ -102,6 +102,19 @@ class UserProfileViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return UserProfile.objects.filter(user=self.request.user)
 
+class UserInfoView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        profile = UserProfile.objects.get(user=user)
+        user_data = UserSerializer(user).data
+        profile_data = UserProfileSerializer(profile).data
+        return Response({
+            'user': user_data,
+            'profile': profile_data
+        })
+
     @action(detail=False, methods=['get'])
     def progress(self, request):
         progress = UserProgress.objects.filter(user=request.user)
