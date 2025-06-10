@@ -4,7 +4,8 @@ from .views import (
     DictationViewSet,
     correct_dictation_view,
     generate_dictation_view,
-    process_image
+    process_image,
+    process_image_gemini
 )
 
 router = DefaultRouter()
@@ -14,7 +15,8 @@ urlpatterns = [
     path('', include(router.urls)),
     path('dictation/correct/', correct_dictation_view, name='correct-dictation'),
     path('dictation/generate/', generate_dictation_view, name='generate-dictation'),
-    path('process-image/', process_image, name='process-image'),
+    path('dictation/process-image/', process_image, name='process-image'),
+    path('dictation/process-image-gemini/', process_image_gemini, name='process-image-gemini'),
 ]
 
 # Pour le débogage

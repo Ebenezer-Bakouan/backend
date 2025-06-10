@@ -202,3 +202,76 @@ def correct_text_with_ai(text):
     except Exception as e:
         print(f"Error correcting text with AI: {str(e)}")
         return text  # Return original text if AI correction fails
+
+@api_view(['POST'])
+def process_image_gemini(request):
+    try:
+        # Get base64 image from request
+        image_data = request.data.get('image')
+        dictation_id = request.data.get('dictation_id')
+        
+        if not image_data:
+            return Response({'error': 'No image data provided'}, status=400)
+
+        # Remove data URL prefix if present
+        if 'base64,' in image_data:
+            image_data = image_data.split('base64,')[1]
+
+        # Convert base64 to bytes
+        image_bytes = base64.b64decode(image_data)
+        
+        # Get the original dictation text for context
+        try:
+            dictation = Dictation.objects.get(id=dictation_id)
+            original_text = dictation.text
+        except Dictation.DoesNotExist:
+            return Response({'error': 'Dictation not found'}, status=404)
+
+        # Create Gemini image input
+        image_parts = [
+            {
+                "mime_type": "image/jpeg",
+                "data": image_bytes
+            }
+        ]
+
+        # Prompt for Gemini
+        prompt = f"""
+        Tu es un expert en correction de dictées françaises.
+        Je te montre une image d'un texte manuscrit qui est censé être la dictée suivante :
+        "{original_text}"
+        
+        1. Extrait exactement le texte manuscrit de l'image
+        2. Compare-le avec le texte original
+        3. Fournis une correction détaillée avec les erreurs trouvées
+        
+        Format de réponse souhaité:
+        {{
+            "texte_extrait": "le texte exact de l'image",
+            "correction": {{
+                "erreurs": [
+                    {{"mot": "mot_erroné", "correction": "mot_correct", "description": "explication"}}
+                ],
+                "score": "score sur 100",
+                "feedback": "feedback général"
+            }}
+        }}
+        """
+
+        # Generate response from Gemini
+        response = model.generate_content(prompt, image_parts)
+        
+        try:
+            # Parse the response to get structured data
+            result = json.loads(response.text)
+            return Response(result)
+        except json.JSONDecodeError:
+            # Fallback to return raw text if JSON parsing fails
+            return Response({
+                "texte_extrait": response.text,
+                "correction": None
+            })
+
+    except Exception as e:
+        logger.error(f"Error processing image with Gemini: {str(e)}")
+        return Response({'error': str(e)}, status=500)
