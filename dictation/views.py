@@ -251,7 +251,17 @@ def process_image_gemini(request):
 
         try:
             # Generate response from Gemini
-            response = model.generate_content(prompt, image_parts)
+            response = model.generate_content({
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inline_data": {
+                            "mime_type": "image/jpeg",
+                            "data": base64.b64encode(image_bytes).decode('utf-8')
+                        }}
+                    ]
+                }]
+            })
             text = response.text.strip()
             
             # Retourner le résultat
