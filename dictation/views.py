@@ -6,14 +6,8 @@ from django.conf import settings
 import google.generativeai as genai
 from gtts import gTTS
 import os
-from .models import (
-    Dictation, DictationAttempt, UserFeedback, DictationCorrection
-)
-from .serializers import (
-    DictationSerializer,
-    DictationAttemptSerializer,
-    UserFeedbackSerializer
-)
+from .models import Dictation, DictationAttempt
+from .serializers import DictationSerializer, DictationAttemptSerializer
 from .services import generate_dictation, correct_dictation
 import logging
 import urllib.parse
@@ -30,8 +24,6 @@ from PIL import Image
 import pytesseract
 import openai
 
-User = get_user_model()
-
 # Configuration du logging
 logger = logging.getLogger(__name__)
 
@@ -46,84 +38,17 @@ except Exception as e:
     logger.exception("Trace complète de l'erreur de configuration Gemini :")
 
 class DictationViewSet(viewsets.ModelViewSet):
-    queryset = Dictation.objects.all()
+    queryset = Dictation.objects.filter(is_public=True)
     serializer_class = DictationSerializer
-
-    def get_queryset(self):
-        return Dictation.objects.filter(is_public=True)
-
-    def perform_create(self, serializer):
-        serializer.save()
 
     @action(detail=True, methods=['post'])
     def attempt(self, request, pk=None):
         dictation = self.get_object()
         serializer = DictationAttemptSerializer(data=request.data)
         if serializer.is_valid():
-            attempt = serializer.save(
-                dictation=dictation,
-                user=request.user
-            )
-            # Mise à jour du profil utilisateur
-            profile = request.user.profile
-            profile.total_attempts += 1
-            if attempt.score:
-                profile.total_score += attempt.score
-            profile.save()
-            
-            # Mise à jour de la progression
-            progress, created = UserProgress.objects.get_or_create(
-                user=request.user,
-                dictation=dictation
-            )
-            progress.attempts_count += 1
-            if attempt.score and attempt.score > progress.best_score:
-                progress.best_score = attempt.score
-            progress.last_attempt = attempt.created_at
-            progress.save()
-            
+            attempt = serializer.save(dictation=dictation)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class UserProfileViewSet(viewsets.ModelViewSet):
-    serializer_class = UserProfileSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return UserProfile.objects.filter(user=self.request.user)
-
-class UserInfoView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        profile = UserProfile.objects.get(user=user)
-        user_data = UserSerializer(user).data
-        profile_data = UserProfileSerializer(profile).data
-        return Response({
-            'user': user_data,
-            'profile': profile_data
-        })
-
-    @action(detail=False, methods=['get'])
-    def progress(self, request):
-        progress = UserProgress.objects.filter(user=request.user)
-        return Response(UserProgressSerializer(progress, many=True).data)
-
-    @action(detail=False, methods=['get'])
-    def achievements(self, request):
-        achievements = UserAchievement.objects.filter(user=request.user)
-        return Response(UserAchievementSerializer(achievements, many=True).data)
-
-class UserFeedbackViewSet(viewsets.ModelViewSet):
-    serializer_class = UserFeedbackSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        return UserFeedback.objects.filter(user=self.request.user)
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
 
     @action(detail=True, methods=['post'])
     def generate_audio(self, request, pk=None):
@@ -195,92 +120,35 @@ class UserFeedbackViewSet(viewsets.ModelViewSet):
             'feedback': feedback
         })
 
-    @action(detail=True, methods=['get'])
-    def attempts(self, request, pk=None):
-        dictation = self.get_object()
-        attempts = DictationAttempt.objects.filter(dictation=dictation).order_by('-created_at')
-        serializer = DictationAttemptSerializer(attempts, many=True)
-        return Response(serializer.data)
-
-    @action(detail=False, methods=['get'])
-    def history(self, request):
-        dictations = self.get_queryset()
-        serializer = self.get_serializer(dictations, many=True)
-        return Response(serializer.data)
-
-class DictationAttemptViewSet(viewsets.ModelViewSet):
-    queryset = DictationAttempt.objects.all().order_by('-created_at')
-    serializer_class = DictationAttemptSerializer
-
-    @action(detail=False, methods=['get'])
-    def my_attempts(self, request):
-        # Ici, vous pourriez filtrer par utilisateur quand l'authentification sera implémentée
-        attempts = self.get_queryset()
-        serializer = self.get_serializer(attempts, many=True)
-        return Response(serializer.data)
-
-class DictationView(APIView):
-    def get(self, request):
-        # Récupérer les paramètres de la requête
-        params = request.query_params.dict()
+@api_view(['POST'])
+def correct_dictation_view(request):
+    """
+    Corrige une dictée soumise de façon pédagogique (alignement intelligent, feedback détaillé).
+    """
+    try:
+        dictation_id = request.data.get('dictation_id')
+        user_text = request.data.get('user_text', '').strip()
         
-        # Générer la dictée
-        result = generate_dictation(params)
+        if not dictation_id:
+            return Response({'error': 'ID de dictée manquant'}, status=status.HTTP_400_BAD_REQUEST)
+        if not user_text:
+            return Response({'error': 'Le texte de la dictée est vide'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            dictation_id = int(dictation_id)
+        except (ValueError, TypeError) as e:
+            return Response({'error': f'ID de dictée invalide: {dictation_id}'}, status=status.HTTP_400_BAD_REQUEST)
         
-        if 'error' in result:
-            return Response({'error': result['error']})
-            
-        # Si la requête demande le lecteur HTML
-        if request.query_params.get('format') == 'html':
-            return render(request, 'dictation_player.html', {
-                'audio_files': [f'/media/{os.path.relpath(f, settings.MEDIA_ROOT)}' for f in result['audio_files']]
-            })
-            
-        return Response(result)
-
-class DictationViewSet(viewsets.ViewSet):
-    def list(self, request):
+        # Correction pédagogique via le service
         try:
-            # Récupération et décodage des paramètres de la requête
-            params = {}
-            for key, value in request.query_params.items():
-                # Décoder les valeurs URL-encoded
-                decoded_value = urllib.parse.unquote(value)
-                params[key] = decoded_value
-            
-            # Génération de la dictée
-            result = generate_dictation(params)
-            
-            return Response(result)
-            
+            result = correct_dictation(user_text, dictation_id)
+            return Response(result, status=status.HTTP_200_OK)
         except Exception as e:
-            logger.error(f"Erreur lors de la génération de la dictée : {str(e)}")
-            return Response(
-                {"error": "Une erreur est survenue lors de la génération de la dictée"},
-                status=500
-            )
+            return Response({'error': f'Erreur lors de la correction: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': f'Erreur lors de la correction de la dictée: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def create(self, request):
-        try:
-            # Génération de la dictée avec les paramètres du body
-            result = generate_dictation(request.data)
-            
-            if 'error' in result:
-                return Response(
-                    {"error": result['error']},
-                    status=400
-                )
-            
-            return Response(result, status=201)
-            
-        except Exception as e:
-            logger.error(f"Erreur lors de la génération de la dictée : {str(e)}")
-            return Response(
-                {"error": "Une erreur est survenue lors de la génération de la dictée"},
-                status=500
-            )
-
-@csrf_exempt
+@api_view(['POST'])
 def generate_dictation_view(request):
     if request.method == 'POST':
         try:
@@ -288,77 +156,8 @@ def generate_dictation_view(request):
             result = generate_dictation(data)
             return JsonResponse(result)
         except Exception as e:
-            logger.error(f"Erreur lors de la génération de la dictée : {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Méthode non autorisée'}, status=405)
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def correct_dictation_view(request):
-    """
-    Corrige une dictée soumise par l'utilisateur de façon pédagogique (alignement intelligent, feedback détaillé).
-    """
-    try:
-        logger.info(f"Requête de correction reçue de l'utilisateur: {request.user.username}")
-        logger.info(f"Headers de la requête: {request.headers}")
-        logger.info(f"Données de la requête: {request.data}")
-        
-        dictation_id = request.data.get('dictation_id')
-        user_text = request.data.get('user_text', '').strip()
-        
-        logger.info(f"Données reçues - dictation_id: {dictation_id}, user_text: {user_text[:50]}...")
-        
-        if not dictation_id:
-            logger.error("ID de dictée manquant")
-            return Response({'error': 'ID de dictée manquant'}, status=status.HTTP_400_BAD_REQUEST)
-        if not user_text:
-            logger.error("Texte de la dictée vide")
-            return Response({'error': 'Le texte de la dictée est vide'}, status=status.HTTP_400_BAD_REQUEST)
-        try:
-            dictation_id = int(dictation_id)
-        except (ValueError, TypeError) as e:
-            logger.error(f"Erreur de conversion de l'ID de dictée: {str(e)}")
-            return Response({'error': f'ID de dictée invalide: {dictation_id}'}, status=status.HTTP_400_BAD_REQUEST)
-        # Correction pédagogique via le service
-        try:
-            result = correct_dictation(user_text, dictation_id)
-            return Response(result, status=status.HTTP_200_OK)
-        except Exception as e:
-            logger.error(f"Erreur lors de la correction pédagogique: {str(e)}")
-            return Response({'error': f'Erreur lors de la correction: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    except Exception as e:
-        logger.error(f"Erreur lors de la correction de la dictée: {str(e)}")
-        logger.exception("Trace complète de l'erreur:")
-        return Response({'error': f'Erreur lors de la correction de la dictée: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-class RegisterView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.save()
-            return Response({
-                'user': UserSerializer(user).data,
-                'message': 'Utilisateur créé avec succès!'
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-class UserProfileView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        profile = UserProfile.objects.get(user=request.user)
-        serializer = UserProfileSerializer(profile)
-        return Response(serializer.data)
-
-    def put(self, request):
-        profile = UserProfile.objects.get(user=request.user)
-        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 def process_image(request):
