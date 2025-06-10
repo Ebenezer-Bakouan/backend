@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView, TokenObtainPairView
 from .views import (
     DictationViewSet,
     UserProfileViewSet, UserFeedbackViewSet,
-    RegisterView, UserInfoView,
+    RegisterView,
     correct_dictation_view,
     generate_dictation_view,
     process_image
