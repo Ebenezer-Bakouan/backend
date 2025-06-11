@@ -8,6 +8,7 @@ import cloudinary
 import cloudinary.uploader
 import cloudinary.api
 from django.conf import settings
+import requests
 
 # Configuration du logging
 logger = logging.getLogger(__name__)
@@ -82,7 +83,6 @@ def generate_dictation(params):
         dict: Dictionnaire contenant le texte de la dictée et le chemin du fichier audio
     """
     try:
-        configure_gemini_api()
         # Extraction des nouveaux paramètres
         age = params.get('age', '12')
         niveau_scolaire = params.get('niveauScolaire', 'Étudiant')
@@ -143,11 +143,30 @@ Tu es un professeur de français expert, spécialisé dans la création de dict�
   "types_conjugaisons": ["passé simple", "imparfait", "futur"]  // si includeConjugaison,
   "accords_complexes": ["accord sujet-verbe inversé", "participe passé avec avoir"]  // si includeGrammaire
 }}
-"""
-        model = genai.GenerativeModel('gemini-2.0-flash')
-        response = model.generate_content(prompt)
+"""        # Utiliser l'API REST Gemini
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}"
+        
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt}
+                ]
+            }]
+        }
+
+        response = requests.post(
+            api_url,
+            json=payload,
+            headers={'Content-Type': 'application/json'}
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Erreur Gemini API: {response.text}")
+            raise Exception(f"Erreur API: {response.status_code}")
+
+        result = response.json()
+        response_text = result['candidates'][0]['content']['parts'][0]['text']
         try:
-            response_text = response.text.strip()
             if not response_text.startswith('{'):
                 response_text = response_text[response_text.find('{'):]
             if not response_text.endswith('}'):
@@ -279,17 +298,15 @@ def correct_dictation(user_text: str, dictation_id: int) -> dict:
             return {
                 **result,
                 'attempt_id': attempt.id
-            }
-        # Configuration de Gemini avec la clé depuis les paramètres
+            }        # Utiliser l'API REST Gemini directement
         api_key = settings.GEMINI_API_KEY
         if not api_key:
             raise ValueError("La clé API Gemini n'est pas configurée")
-        genai.configure(api_key=api_key)
-        
-        # Utilisation du modèle Gemini adapté
-        model = genai.GenerativeModel('gemini-pro')
 
-        # Prompt pour la correction (utilise les textes nettoyés)
+        # Préparation de l'appel API REST
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+
+        # Prompt pour la correction(utilise les textes nettoyés)
         prompt = f"""
 Tu es un professeur de français expérimenté qui corrige les dictées d'élèves en Afrique francophone (Burkina Faso en particulier). Tu fais une correction juste, logique et bienveillante.
 
@@ -372,10 +389,30 @@ Format OBLIGATOIRE :
 }}
 
 RAPPEL : Si tu ne respectes pas ce format JSON strict, ta réponse sera ignorée et tu seras pénalisé. Réponds uniquement avec l'objet JSON strictement valide.
-"""
-        # Génération de la correction avec Gemini
-        response = model.generate_content(prompt)
-        response_text = response.text.strip()
+"""        # Utiliser l'API REST Gemini
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}"
+        
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt}
+                ]
+            }]
+        }
+
+        response = requests.post(
+            api_url,
+            json=payload,
+            headers={'Content-Type': 'application/json'}
+        )
+
+        if response.status_code != 200:
+            logger.error(f"Erreur Gemini API: {response.text}")
+            raise Exception(f"Erreur API: {response.status_code}")
+
+        result = response.json()
+        response_text = result['candidates'][0]['content']['parts'][0]['text']
+        
         # Correction : extraire le JSON même s'il est entouré de texte ou de balises
         if '```json' in response_text:
             response_text = response_text.split('```json',1)[-1]
@@ -412,3 +449,36 @@ RAPPEL : Si tu ne respectes pas ce format JSON strict, ta réponse sera ignorée
     except Exception as e:
         logger.error(f"Erreur lors de la correction de la dictée : {str(e)}")
         raise
+
+def call_gemini_api(prompt: str) -> dict:
+    """
+    Appelle l'API REST Gemini directement.
+    """
+    import requests
+    
+    api_key = settings.GEMINI_API_KEY
+    if not api_key:
+        raise ValueError("La clé API Gemini n'est pas configurée")
+
+    api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt}
+            ]
+        }]
+    }
+
+    response = requests.post(
+        api_url,
+        json=payload,
+        headers={'Content-Type': 'application/json'}
+    )
+    
+    if response.status_code != 200:
+        logger.error(f"Erreur Gemini API: {response.text}")
+        raise Exception(f"Erreur API: {response.status_code}")
+        
+    result = response.json()
+    return result
