@@ -240,9 +240,9 @@ def process_image_gemini(request):
         ]
 
         # Configurer le modèle Gemini
-        model = genai.GenerativeModel('gemini-pro-vision')
-        
-        # Prompt pour l'extraction de texte
+
+        model = genai.GenerativeModel('gemini-2-0-flash') # Changed from 'gemini-pro-vision'
+
         prompt = """
         Tu es un expert en reconnaissance de texte manuscrit en français.
         Examine l'image fournie et extrait exactement le texte que tu y vois.
