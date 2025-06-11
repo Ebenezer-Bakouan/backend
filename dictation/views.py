@@ -206,17 +206,8 @@ def correct_text_with_ai(text):
 @api_view(['POST'])
 def process_image_gemini(request):
     try:
-        # Configuration de l'API Gemini
-        api_key = settings.GEMINI_API_KEY
-        if not api_key:
-            logger.error("Clé API Gemini non configurée")
-            return Response({'error': "Configuration de l'API manquante"}, status=500)
-        genai.configure(api_key=api_key)
-        
         # Get base64 image from request
         image_data = request.data.get('image')
-        dictation_id = request.data.get('dictation_id')
-        
         if not image_data:
             return Response({'error': 'Aucune image fournie'}, status=400)
 
@@ -224,37 +215,42 @@ def process_image_gemini(request):
         if 'base64,' in image_data:
             image_data = image_data.split('base64,')[1]
 
-        # Convert base64 to bytes
-        try:
-            image_bytes = base64.b64decode(image_data)
-        except Exception as e:
-            logger.error(f"Erreur lors du décodage de l'image : {str(e)}")
-            return Response({'error': "Format d'image invalide"}, status=400)
-        
-        # Create Gemini image input
-        image_parts = [
-            {
-                "mime_type": "image/jpeg",
-                "data": image_bytes
-            }
-        ]
-
-        # Configurer le modèle Gemini
-
-        model = genai.GenerativeModel('gemini-2-0-flash') # Changed from 'gemini-pro-vision'
-
-        prompt = """
-        Tu es un expert en reconnaissance de texte manuscrit en français.
+        # Préparer le prompt
+        prompt = """Tu es un expert en reconnaissance de texte manuscrit en français.
         Examine l'image fournie et extrait exactement le texte que tu y vois.
-        Retourne uniquement le texte extrait, sans commentaires ni formatage.
-        """
+        Retourne uniquement le texte extrait, sans commentaires ni formatage."""
 
-        try:            # Generate response from Gemini
-            response = model.generate_content([
-                prompt,
-                {"mime_type": "image/jpeg", "data": base64.b64encode(image_bytes).decode('utf-8')}
-            ])
-            text = response.text.strip()
+        # Préparer la requête pour l'API Gemini
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={settings.GEMINI_API_KEY}"
+        
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {
+                        "inline_data": {
+                            "mime_type": "image/jpeg",
+                            "data": image_data
+                        }
+                    }
+                ]
+            }]
+        }
+
+        try:
+            import requests
+            response = requests.post(
+                api_url,
+                json=payload,
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            if response.status_code != 200:
+                logger.error(f"Erreur Gemini API: {response.text}")
+                raise Exception(f"Erreur API: {response.status_code}")
+                
+            result = response.json()
+            text = result['candidates'][0]['content']['parts'][0]['text'].strip()
             
             # Retourner le résultat
             return Response({
