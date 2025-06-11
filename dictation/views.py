@@ -249,19 +249,11 @@ def process_image_gemini(request):
         Retourne uniquement le texte extrait, sans commentaires ni formatage.
         """
 
-        try:
-            # Generate response from Gemini
-            response = model.generate_content({
-                "contents": [{
-                    "parts": [
-                        {"text": prompt},
-                        {"inline_data": {
-                            "mime_type": "image/jpeg",
-                            "data": base64.b64encode(image_bytes).decode('utf-8')
-                        }}
-                    ]
-                }]
-            })
+        try:            # Generate response from Gemini
+            response = model.generate_content([
+                prompt,
+                {"mime_type": "image/jpeg", "data": base64.b64encode(image_bytes).decode('utf-8')}
+            ])
             text = response.text.strip()
             
             # Retourner le résultat
