@@ -75,7 +75,7 @@ WSGI_APPLICATION = 'dictation_backend.wsgi.application'
 # Database
 DATABASES = {
     'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL', 'postgresql://dicte_user:1dt2tsTB8fZv1xNLQG12PYD9ZmidM8Xr@dpg-d0un2mc9c44c73bf6ac0-a.oregon-postgres.render.com/dicte'),
+        default=os.environ.get('DATABASE_URL', 'postgresql://postgres:[YOUR-PASSWORD]@db.gylgitidqolvamfshpwu.supabase.co:5432/postgres'),
         conn_max_age=600
     )
 }
